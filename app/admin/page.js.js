@@ -16,6 +16,8 @@ function ProductImage({src,alt,className}){
   return <img src={src} alt={alt} className={className} style={{objectFit:"cover"}}/>;
 }
 
+const ORDER_STATUSES = ["جديد", "تم التأكيد", "قيد التجهيز", "تم الشحن", "خرج للتوصيل", "تم التسليم", "تم الإلغاء"];
+
 export default function AdminPage(){
   const [authed,setAuthed] = useState(false);
   const [checking,setChecking] = useState(true);
@@ -28,7 +30,7 @@ export default function AdminPage(){
   const [categories,setCategories] = useState([]);
   const [coupons,setCoupons] = useState([]);
   const [orders,setOrders] = useState([]);
-  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:""});
+  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60});
 
   const [showForm,setShowForm] = useState(false);
   const [editing,setEditing] = useState(null);
@@ -115,8 +117,20 @@ export default function AdminPage(){
   }
   async function deleteCoupon(code){ await fetch(`/api/coupons/${code}`, {method:"DELETE"}); await loadAll(); }
 
+  async function updateOrderStatus(id, status){
+    await fetch(`/api/orders/${id}`, { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status}) });
+    await loadAll();
+    showToast("تم تحديث حالة الطلب");
+  }
+
   async function saveSettings(){
-    await fetch("/api/settings", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({storeName:settings.store_name, whatsapp:settings.whatsapp, adminPassword:settings.admin_password}) });
+    await fetch("/api/settings", {
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        storeName:settings.store_name, whatsapp:settings.whatsapp,
+        adminPassword:settings.admin_password, shippingCost:settings.shipping_cost,
+      }),
+    });
     showToast("تم حفظ الإعدادات");
   }
 
@@ -234,10 +248,28 @@ export default function AdminPage(){
               <div className="kh-orders">
                 {orders.map(o=>(
                   <div key={o.id} className="kh-order-card">
-                    <div className="kh-order-head"><strong>{o.id}</strong><span>{new Date(o.created_at).toLocaleString("ar-EG")}</span><span className="kh-status ok">{o.status}</span></div>
-                    <div className="kh-order-customer">{o.customer?.name} — {o.customer?.phone} — {o.customer?.address}</div>
+                    <div className="kh-order-head">
+                      <strong>{o.order_number || o.id}</strong>
+                      <span>{new Date(o.created_at).toLocaleString("ar-EG")}</span>
+                      <select
+                        value={o.status}
+                        onChange={e=>updateOrderStatus(o.id, e.target.value)}
+                        style={{marginRight:"auto", padding:"5px 10px", borderRadius:999, border:"1px solid rgba(53,67,49,.2)", fontSize:".8rem", fontWeight:700, background:"var(--white)"}}
+                      >
+                        {ORDER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="kh-order-customer">
+                      {o.customer?.name} — {o.customer?.phone}{o.phone2 ? ` / ${o.phone2}` : ""}
+                    </div>
+                    <div className="kh-order-customer">
+                      {o.governorate}{o.city ? " — "+o.city : ""}{o.area ? " — "+o.area : ""} — {o.customer?.address}
+                      {o.landmark && ` (${o.landmark})`}
+                    </div>
                     <ul>{(o.items||[]).map((it,i)=><li key={i}>{it.name} × {it.qty} — {egp(it.price*it.qty)} ج.م</li>)}</ul>
-                    <div className="kh-order-total">الإجمالي: {egp(o.total)} ج.م {o.coupon_code && `(كوبون ${o.coupon_code})`}</div>
+                    <div className="kh-order-total">
+                      الإجمالي: {egp(o.total)} ج.م (شحن {egp(o.shipping_cost)} ج.م) {o.coupon_code && `(كوبون ${o.coupon_code})`} — الدفع عند الاستلام
+                    </div>
                   </div>
                 ))}
               </div>
@@ -248,6 +280,7 @@ export default function AdminPage(){
             <div className="kh-form" style={{maxWidth:420}}>
               <label>اسم المتجر<input value={settings.store_name||""} onChange={e=>setSettings({...settings,store_name:e.target.value})}/></label>
               <label>رقم واتساب (بالصيغة الدولية بدون +)<input value={settings.whatsapp||""} onChange={e=>setSettings({...settings,whatsapp:e.target.value})} placeholder="201000000000"/></label>
+              <label>تكلفة الشحن (ج.م)<input type="number" value={settings.shipping_cost ?? 60} onChange={e=>setSettings({...settings,shipping_cost:e.target.value})}/></label>
               <label>كلمة مرور لوحة التحكم<input value={settings.admin_password||""} onChange={e=>setSettings({...settings,admin_password:e.target.value})}/></label>
               <button className="kh-btn kh-btn-primary" onClick={saveSettings}>حفظ الإعدادات</button>
             </div>

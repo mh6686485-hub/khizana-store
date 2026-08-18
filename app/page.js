@@ -73,7 +73,7 @@ export default function StorePage(){
   const [products,setProducts] = useState([]);
   const [categories,setCategories] = useState([]);
   const [coupons,setCoupons] = useState([]);
-  const [settings,setSettings] = useState({store_name:"خِزانة", whatsapp:"201000000000"});
+  const [settings,setSettings] = useState({store_name:"خِزانة", whatsapp:"201000000000", shipping_cost:60});
   const [loading,setLoading] = useState(true);
   const [search,setSearch] = useState("");
   const [activeCategory,setActiveCategory] = useState("الكل");
@@ -86,6 +86,7 @@ export default function StorePage(){
   const [appliedCoupon,setAppliedCoupon] = useState(null);
   const [couponMsg,setCouponMsg] = useState("");
   const [toast,setToast] = useState("");
+  const [successOrder,setSuccessOrder] = useState(null);
 
   function showToast(msg){ setToast(msg); setTimeout(()=>setToast(""),2600); }
 
@@ -148,21 +149,29 @@ export default function StorePage(){
     setCouponMsg("تم تطبيق الكوبون بنجاح");
   }
 
-  async function submitOrder(customer){
+  async function submitOrder(form){
     const items = cartLines.map(l=>({productId:l.product.id, code:l.product.code, name:l.product.name, price:l.product.price, qty:l.qty}));
-    const payload = { items, subtotal, discount:couponDiscount, couponCode: appliedCoupon?appliedCoupon.code:null, total, customer };
+    const customer = { name:form.name, phone:form.phone, phone2:form.phone2, address:form.address };
+    const payload = {
+      items, subtotal, discount:couponDiscount, couponCode: appliedCoupon?appliedCoupon.code:null, total, customer,
+      governorate: form.governorate, city: form.city, area: form.area, landmark: form.landmark,
+    };
     try{
-      await fetch("/api/orders", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
-    }catch(e){ console.error(e); }
+      const res = await fetch("/api/orders", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
+      const order = await res.json();
+      setCart([]); setAppliedCoupon(null); setCouponInput(""); setCheckoutOpen(false); setCartOpen(false);
+      setSuccessOrder(order);
+    }catch(e){
+      console.error(e);
+      showToast("حدث خطأ أثناء إرسال الطلب، حاول تاني");
+    }
+  }
 
-    const lines = cartLines.map(l=>`• ${l.product.name} × ${l.qty} = ${egp(l.product.price*l.qty)} ج.م`).join("\n");
-    const msg = `طلب جديد من ${settings.store_name}\n\n${lines}\n\nالإجمالي الفرعي: ${egp(subtotal)} ج.م` +
-      (couponDiscount ? `\nخصم الكوبون (${appliedCoupon.code}): -${egp(couponDiscount)} ج.م` : "") +
-      `\nالإجمالي النهائي: ${egp(total)} ج.م\n\nالاسم: ${customer.name}\nالتليفون: ${customer.phone}\nالعنوان: ${customer.address}`;
+  function sendOrderOnWhatsapp(order){
+    const items = order.items || [];
+    const lines = items.map(it=>`• ${it.name} × ${it.qty} = ${egp(it.price*it.qty)} ج.م`).join("\n");
+    const msg = `طلب رقم ${order.order_number} من ${settings.store_name}\n\n${lines}\n\nالإجمالي: ${egp(order.total)} ج.م`;
     window.open(`https://wa.me/${settings.whatsapp}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
-
-    setCart([]); setAppliedCoupon(null); setCouponInput(""); setCheckoutOpen(false); setCartOpen(false);
-    showToast("تم إرسال طلبك، هنتواصل معاك على واتساب");
   }
 
   function goCategory(name){
@@ -308,7 +317,10 @@ export default function StorePage(){
       <footer className="kh-footer">
         <div className="kh-wrap kh-footer-inner">
           <span>© 2026 {settings.store_name}. جميع الحقوق محفوظة.</span>
-          <Link href="/admin" className="kh-admin-link"><Lock size={13}/> لوحة التحكم</Link>
+          <div style={{display:"flex", gap:18}}>
+            <Link href="/track" className="kh-admin-link">تتبع طلبك</Link>
+            <Link href="/admin" className="kh-admin-link"><Lock size={13}/> لوحة التحكم</Link>
+          </div>
         </div>
       </footer>
 
@@ -321,12 +333,21 @@ export default function StorePage(){
 
       {cartOpen && (
         <CartDrawer lines={cartLines} subtotal={subtotal} couponDiscount={couponDiscount} total={total}
+          shippingCost={settings.shipping_cost}
           couponInput={couponInput} setCouponInput={setCouponInput} applyCoupon={applyCoupon} couponMsg={couponMsg}
           appliedCoupon={appliedCoupon} updateQty={updateQty} onClose={()=>setCartOpen(false)}
           onCheckout={()=>{ setCartOpen(false); setCheckoutOpen(true); }} />
       )}
 
-      {checkoutOpen && <CheckoutModal onClose={()=>setCheckoutOpen(false)} onSubmit={submitOrder} total={total} />}
+      {checkoutOpen && (
+        <CheckoutModal onClose={()=>setCheckoutOpen(false)} onSubmit={submitOrder}
+          total={total} shippingCost={settings.shipping_cost} />
+      )}
+
+      {successOrder && (
+        <OrderSuccessModal order={successOrder} storeName={settings.store_name}
+          onClose={()=>setSuccessOrder(null)} onWhatsapp={()=>sendOrderOnWhatsapp(successOrder)} />
+      )}
     </div>
   );
 }
@@ -410,7 +431,8 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
   );
 }
 
-function CartDrawer({lines,subtotal,couponDiscount,total,couponInput,setCouponInput,applyCoupon,couponMsg,appliedCoupon,updateQty,onClose,onCheckout}){
+function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,couponInput,setCouponInput,applyCoupon,couponMsg,appliedCoupon,updateQty,onClose,onCheckout}){
+  const grandTotal = total + Number(shippingCost || 0);
   return (
     <div className="kh-overlay" onClick={onClose}>
       <div className="kh-drawer" onClick={e=>e.stopPropagation()}>
@@ -444,9 +466,10 @@ function CartDrawer({lines,subtotal,couponDiscount,total,couponInput,setCouponIn
             <div className="kh-cart-summary">
               <div><span>الإجمالي الفرعي</span><span>{egp(subtotal)} ج.م</span></div>
               {couponDiscount>0 && <div><span>خصم الكوبون</span><span>-{egp(couponDiscount)} ج.م</span></div>}
-              <div className="kh-cart-total"><span>الإجمالي</span><span>{egp(total)} ج.م</span></div>
+              <div><span>الشحن</span><span>{egp(shippingCost)} ج.م</span></div>
+              <div className="kh-cart-total"><span>الإجمالي</span><span>{egp(grandTotal)} ج.م</span></div>
             </div>
-            <button className="kh-btn kh-btn-primary kh-full" onClick={onCheckout}>إتمام الطلب عبر واتساب</button>
+            <button className="kh-btn kh-btn-primary kh-full" onClick={onCheckout}>إتمام الطلب</button>
           </>
         )}
       </div>
@@ -454,21 +477,80 @@ function CartDrawer({lines,subtotal,couponDiscount,total,couponInput,setCouponIn
   );
 }
 
-function CheckoutModal({onClose,onSubmit,total}){
-  const [form,setForm] = useState({name:"",phone:"",address:""});
-  const canSubmit = form.name.trim() && form.phone.trim() && form.address.trim();
+const EGYPT_GOVERNORATES = [
+  "القاهرة","الجيزة","الإسكندرية","القليوبية","الشرقية","الدقهلية","الغربية","المنوفية",
+  "البحيرة","كفر الشيخ","دمياط","بورسعيد","الإسماعيلية","السويس","شمال سيناء","جنوب سيناء",
+  "بني سويف","الفيوم","المنيا","أسيوط","سوهاج","قنا","الأقصر","أسوان","البحر الأحمر",
+  "الوادي الجديد","مطروح",
+];
+
+function CheckoutModal({onClose,onSubmit,total,shippingCost}){
+  const [form,setForm] = useState({name:"",phone:"",phone2:"",governorate:"",city:"",area:"",address:"",landmark:""});
+  const [submitting,setSubmitting] = useState(false);
+  const canSubmit = form.name.trim() && form.phone.trim() && form.governorate && form.city.trim() && form.address.trim();
+  const grandTotal = total + Number(shippingCost || 0);
+
+  async function handleSubmit(){
+    setSubmitting(true);
+    await onSubmit(form);
+    setSubmitting(false);
+  }
+
   return (
     <div className="kh-overlay" onClick={onClose}>
-      <div className="kh-modal" onClick={e=>e.stopPropagation()} style={{maxWidth:440}}>
+      <div className="kh-modal" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
         <button className="kh-close" onClick={onClose}><X size={18}/></button>
         <h3>بيانات التوصيل</h3>
-        <p className="kh-muted">الإجمالي: {egp(total)} ج.م — الدفع عند الاستلام</p>
+        <p className="kh-muted">
+          المنتجات: {egp(total)} ج.م + شحن {egp(shippingCost)} ج.م = <strong>{egp(grandTotal)} ج.م</strong> — الدفع عند الاستلام
+        </p>
         <div className="kh-form">
-          <label>الاسم الكامل<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
-          <label>رقم التليفون<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="01xxxxxxxxx"/></label>
+          <div className="kh-form-grid">
+            <label>الاسم بالكامل<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
+            <label>رقم الموبايل<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="01xxxxxxxxx"/></label>
+          </div>
+          <label>رقم موبايل احتياطي (اختياري)<input value={form.phone2} onChange={e=>setForm({...form,phone2:e.target.value})} placeholder="01xxxxxxxxx"/></label>
+          <div className="kh-form-grid">
+            <label>المحافظة
+              <select value={form.governorate} onChange={e=>setForm({...form,governorate:e.target.value})}>
+                <option value="">اختر المحافظة</option>
+                {EGYPT_GOVERNORATES.map(g=><option key={g} value={g}>{g}</option>)}
+              </select>
+            </label>
+            <label>المدينة / المركز<input value={form.city} onChange={e=>setForm({...form,city:e.target.value})}/></label>
+          </div>
+          <label>المنطقة (اختياري)<input value={form.area} onChange={e=>setForm({...form,area:e.target.value})}/></label>
           <label>العنوان بالتفصيل<textarea rows={3} value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/></label>
+          <label>علامة مميزة (اختياري)<input value={form.landmark} onChange={e=>setForm({...form,landmark:e.target.value})} placeholder="بجوار..."/></label>
+          <div className="kh-cat-item" style={{cursor:"default"}}>
+            <span>طريقة الدفع</span>
+            <strong style={{color:"var(--olive-deep)"}}>الدفع عند الاستلام</strong>
+          </div>
         </div>
-        <button className="kh-btn kh-btn-primary kh-full" disabled={!canSubmit} onClick={()=>onSubmit(form)}>إرسال الطلب عبر واتساب</button>
+        <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:14}} disabled={!canSubmit || submitting} onClick={handleSubmit}>
+          {submitting ? "جارِ الإرسال..." : "تأكيد الطلب"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OrderSuccessModal({order,storeName,onClose,onWhatsapp}){
+  return (
+    <div className="kh-overlay" onClick={onClose}>
+      <div className="kh-modal" onClick={e=>e.stopPropagation()} style={{maxWidth:440, textAlign:"center"}}>
+        <button className="kh-close" onClick={onClose}><X size={18}/></button>
+        <div style={{width:64,height:64,borderRadius:"50%",background:"var(--cream-deep)",display:"flex",alignItems:"center",justifyContent:"center",margin:"8px auto 18px",color:"var(--olive-deep)"}}>
+          <Check size={32}/>
+        </div>
+        <h2 style={{marginBottom:8}}>تم استلام طلبك بنجاح 🎉</h2>
+        <p className="kh-muted" style={{marginBottom:4}}>رقم الطلب</p>
+        <div style={{fontSize:"1.6rem",fontWeight:700,color:"var(--olive-deep)",marginBottom:16}}>{order.order_number}</div>
+        <p className="kh-muted" style={{marginBottom:22}}>شكرًا لطلبك من {storeName} ❤️<br/>سيتم مراجعة طلبك والتواصل معك لتأكيده.</p>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <Link href={`/track?order=${encodeURIComponent(order.order_number)}`} className="kh-btn kh-btn-primary kh-full">تتبع الطلب</Link>
+          <button className="kh-btn kh-btn-sage kh-full" onClick={onWhatsapp}>التواصل عبر واتساب</button>
+        </div>
       </div>
     </div>
   );
