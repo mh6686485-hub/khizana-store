@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, ImageOff, Lock, Truck, ShieldCheck, Headphones, Wallet, Leaf } from "lucide-react";
+import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, ImageOff, Lock, Truck, ShieldCheck, Headphones, Wallet, Leaf, Star, User } from "lucide-react";
 import Link from "next/link";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
@@ -87,8 +87,23 @@ export default function StorePage(){
   const [couponMsg,setCouponMsg] = useState("");
   const [toast,setToast] = useState("");
   const [successOrder,setSuccessOrder] = useState(null);
+  const [phone,setPhone] = useState(null);
+  const [accountPromptOpen,setAccountPromptOpen] = useState(false);
+  const [pendingWishlistProduct,setPendingWishlistProduct] = useState(null);
 
   function showToast(msg){ setToast(msg); setTimeout(()=>setToast(""),2600); }
+
+  useEffect(()=>{
+    const saved = typeof window !== "undefined" ? localStorage.getItem("kh_phone") : null;
+    if(saved) setPhone(saved);
+  },[]);
+
+  useEffect(()=>{
+    if(!phone) return;
+    fetch(`/api/wishlist?phone=${encodeURIComponent(phone)}`)
+      .then(r=>r.json()).then(ids=>setWishlist(Array.isArray(ids)?ids:[]))
+      .catch(()=>{});
+  },[phone]);
 
   useEffect(()=>{
     (async()=>{
@@ -105,8 +120,9 @@ export default function StorePage(){
     })();
   },[]);
 
-  const offerProducts = products.filter(p=>p.offer_expiry && remainingTime(p.offer_expiry));
-  const filteredProducts = products.filter(p=>{
+  const visibleProducts = products.filter(p=>p.status==="available" && Number(p.stock ?? 1) > 0);
+  const offerProducts = visibleProducts.filter(p=>p.offer_expiry && remainingTime(p.offer_expiry));
+  const filteredProducts = visibleProducts.filter(p=>{
     const matchCat = activeCategory==="الكل" || p.category===activeCategory;
     const q = search.trim().toLowerCase();
     const matchSearch = !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
@@ -140,7 +156,29 @@ export default function StorePage(){
     setCart(prev=>prev.map(c=>c.productId===productId?{...c,qty}:c));
   }
   function toggleWishlist(productId){
-    setWishlist(prev=>prev.includes(productId)?prev.filter(id=>id!==productId):[...prev,productId]);
+    if(!phone){
+      setPendingWishlistProduct(productId);
+      setAccountPromptOpen(true);
+      return;
+    }
+    const inList = wishlist.includes(productId);
+    setWishlist(prev=>inList?prev.filter(id=>id!==productId):[...prev,productId]);
+    if(inList){
+      fetch(`/api/wishlist?phone=${encodeURIComponent(phone)}&productId=${productId}`, {method:"DELETE"}).catch(()=>{});
+    }else{
+      fetch("/api/wishlist", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({phone,productId})}).catch(()=>{});
+    }
+  }
+  function confirmPhone(value){
+    localStorage.setItem("kh_phone", value);
+    setPhone(value);
+    setAccountPromptOpen(false);
+    if(pendingWishlistProduct){
+      const pid = pendingWishlistProduct;
+      setPendingWishlistProduct(null);
+      setWishlist(prev=>prev.includes(pid)?prev:[...prev,pid]);
+      fetch("/api/wishlist", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({phone:value,productId:pid})}).catch(()=>{});
+    }
   }
   function applyCoupon(){
     const code = couponInput.trim().toUpperCase();
@@ -218,16 +256,19 @@ export default function StorePage(){
             <input placeholder="ابحث عن منتج..." value={search} onChange={e=>setSearch(e.target.value)} />
           </div>
           <div className="kh-header-actions">
-            <Link href="/admin" className="kh-action-btn">
-              <Lock size={19}/> الإدارة
+            <Link href="/account" className="kh-action-btn">
+              <span style={{position:"relative"}}>
+                <User size={19}/>
+              </span>
+              حسابي
             </Link>
-            <button className="kh-action-btn" onClick={()=>{}} aria-label="المفضلة">
+            <Link href="/account?tab=wishlist" className="kh-action-btn">
               <span style={{position:"relative"}}>
                 <Heart size={19}/>
                 {wishlistCount>0 && <span className="kh-badge">{wishlistCount}</span>}
               </span>
               المفضلة
-            </button>
+            </Link>
             <button className="kh-action-btn" onClick={()=>setCartOpen(true)} aria-label="السلة">
               <span style={{position:"relative"}}>
                 <ShoppingCart size={19}/>
@@ -353,6 +394,38 @@ export default function StorePage(){
         <OrderSuccessModal order={successOrder} storeName={settings.store_name}
           onClose={()=>setSuccessOrder(null)} onWhatsapp={()=>sendOrderOnWhatsapp(successOrder)} />
       )}
+
+      {accountPromptOpen && (
+        <AccountPromptModal onClose={()=>{setAccountPromptOpen(false); setPendingWishlistProduct(null);}} onConfirm={confirmPhone} />
+      )}
+
+      {cartCount>0 && !cartOpen && (
+        <button className="kh-fab-cart" onClick={()=>setCartOpen(true)} aria-label="السلة">
+          <ShoppingCart size={22}/>
+          <span className="kh-fab-badge">{cartCount}</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AccountPromptModal({onClose,onConfirm}){
+  const [value,setValue] = useState("");
+  return (
+    <div className="kh-overlay" onClick={onClose}>
+      <div className="kh-modal" onClick={e=>e.stopPropagation()} style={{maxWidth:380, textAlign:"center"}}>
+        <button className="kh-close" onClick={onClose}><X size={18}/></button>
+        <div style={{width:56,height:56,borderRadius:"50%",background:"var(--cream-deep)",display:"flex",alignItems:"center",justifyContent:"center",margin:"6px auto 16px",color:"var(--olive-deep)"}}>
+          <User size={26}/>
+        </div>
+        <h3 style={{marginBottom:8}}>حسابي في خِزانة</h3>
+        <p className="kh-muted" style={{marginBottom:18}}>أدخل رقم موبايلك عشان نحفظلك المفضلة ونعرض طلباتك</p>
+        <div className="kh-form">
+          <input value={value} onChange={e=>setValue(e.target.value)} placeholder="01xxxxxxxxx"/>
+        </div>
+        <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:14}}
+          disabled={value.trim().length<8} onClick={()=>onConfirm(value.trim())}>دخول</button>
+      </div>
     </div>
   );
 }
@@ -393,10 +466,36 @@ function ProductCard({product,inWishlist,onToggleWishlist,onAdd,onOpen,showOffer
 
 function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,toggleWishlist}){
   const [qty,setQty] = useState(1);
+  const [reviews,setReviews] = useState([]);
+  const [reviewsLoading,setReviewsLoading] = useState(true);
+  const [reviewForm,setReviewForm] = useState({name:"",rating:5,comment:""});
+  const [reviewSubmitted,setReviewSubmitted] = useState(false);
   const disc = discountPercent(product.price, product.original_price);
   const stock = Number(product.stock ?? 20);
   const available = product.status === "available" && stock > 0;
   const lowStock = available && stock <= Number(product.min_stock ?? 5);
+
+  useEffect(()=>{
+    setReviewsLoading(true);
+    fetch(`/api/reviews?productId=${product.id}`)
+      .then(r=>r.json()).then(d=>setReviews(Array.isArray(d)?d:[]))
+      .catch(()=>{}).finally(()=>setReviewsLoading(false));
+  },[product.id]);
+
+  const avgRating = reviews.length ? (reviews.reduce((s,r)=>s+r.rating,0)/reviews.length) : 0;
+
+  async function submitReview(e){
+    e.preventDefault();
+    if(!reviewForm.name.trim()) return;
+    try{
+      await fetch("/api/reviews", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ productId:product.id, name:reviewForm.name, rating:reviewForm.rating, comment:reviewForm.comment }),
+      });
+      setReviewSubmitted(true);
+    }catch(err){ console.error(err); }
+  }
+
   function orderNow(){
     const msg = `مرحباً، حابب أطلب:\n${product.name} (${product.code}) × ${qty}\nالسعر: ${egp(product.price*qty)} ج.م\nمن ${storeName}`;
     window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
@@ -410,6 +509,12 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
           <div>
             <span className="kh-prod-code">{product.code}</span>
             <h2>{product.name}</h2>
+            {reviews.length>0 && (
+              <div className="kh-stars-row">
+                {[1,2,3,4,5].map(n=><Star key={n} size={14} fill={n<=Math.round(avgRating)?"var(--terracotta)":"none"} color="var(--terracotta)"/>)}
+                <span className="kh-muted" style={{fontSize:".8rem"}}>({reviews.length} تقييم)</span>
+              </div>
+            )}
             <div className="kh-detail-price-row">
               <span className="kh-price" style={{fontSize:"1.6rem"}}>{egp(product.price)} <small>ج.م</small></span>
               {disc>0 && <span className="kh-price-old">{egp(product.original_price)} ج.م</span>}
@@ -436,6 +541,41 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="kh-reviews-section">
+          <h3 style={{fontSize:"1.05rem", marginBottom:14}}>آراء العملاء</h3>
+          {!reviewsLoading && reviews.length===0 && <p className="kh-muted" style={{marginBottom:14}}>لسه مفيش تقييمات على المنتج ده، كن أول من يقيّمه.</p>}
+          {reviews.length>0 && (
+            <div className="kh-review-list">
+              {reviews.map(r=>(
+                <div key={r.id} className="kh-review-item">
+                  <div className="kh-stars-row">
+                    {[1,2,3,4,5].map(n=><Star key={n} size={13} fill={n<=r.rating?"var(--terracotta)":"none"} color="var(--terracotta)"/>)}
+                    <strong style={{fontSize:".85rem"}}>{r.name}</strong>
+                  </div>
+                  {r.comment && <p style={{fontSize:".85rem", color:"var(--ink-soft)", margin:"4px 0 0"}}>{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {reviewSubmitted ? (
+            <p className="kh-avail ok" style={{marginTop:14}}><Check size={14}/> شكراً لتقييمك، هيظهر بعد المراجعة.</p>
+          ) : (
+            <form className="kh-form" onSubmit={submitReview} style={{marginTop:16}}>
+              <div className="kh-form-grid">
+                <label>اسمك<input value={reviewForm.name} onChange={e=>setReviewForm({...reviewForm,name:e.target.value})} required/></label>
+                <label>تقييمك
+                  <select value={reviewForm.rating} onChange={e=>setReviewForm({...reviewForm,rating:Number(e.target.value)})}>
+                    {[5,4,3,2,1].map(n=><option key={n} value={n}>{"⭐".repeat(n)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label>تعليقك (اختياري)<textarea rows={2} value={reviewForm.comment} onChange={e=>setReviewForm({...reviewForm,comment:e.target.value})}/></label>
+              <button className="kh-btn kh-btn-sage" type="submit">إرسال التقييم</button>
+            </form>
+          )}
         </div>
       </div>
     </div>

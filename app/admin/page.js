@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, LogOut, Package, LayoutGrid, Ticket, Tag, Settings as SettingsIcon, X, Upload, ImageOff } from "lucide-react";
+import { Plus, Pencil, Trash2, LogOut, Package, LayoutGrid, Ticket, Tag, Settings as SettingsIcon, X, Upload, ImageOff, LayoutDashboard, Star, Bell, ShoppingBag, DollarSign, Users } from "lucide-react";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
 function fileToBase64(file){
@@ -23,13 +23,15 @@ export default function AdminPage(){
   const [checking,setChecking] = useState(true);
   const [pw,setPw] = useState("");
   const [error,setError] = useState("");
-  const [tab,setTab] = useState("products");
+  const [tab,setTab] = useState("dashboard");
   const [toast,setToast] = useState("");
 
   const [products,setProducts] = useState([]);
   const [categories,setCategories] = useState([]);
   const [coupons,setCoupons] = useState([]);
   const [orders,setOrders] = useState([]);
+  const [reviews,setReviews] = useState([]);
+  const [report,setReport] = useState(null);
   const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60});
 
   const [showForm,setShowForm] = useState(false);
@@ -52,14 +54,18 @@ export default function AdminPage(){
   },[]);
 
   async function loadAll(){
-    const [p,c,cp,o,s] = await Promise.all([
+    const [p,c,cp,o,s,rv,rp] = await Promise.all([
       fetch("/api/products").then(r=>r.json()),
       fetch("/api/categories").then(r=>r.json()),
       fetch("/api/coupons").then(r=>r.json()),
       fetch("/api/orders").then(r=>r.json()),
       fetch("/api/settings").then(r=>r.json()),
+      fetch("/api/reviews").then(r=>r.json()),
+      fetch("/api/reports").then(r=>r.json()),
     ]);
     setProducts(p); setCategories(c); setCoupons(cp); setOrders(o); setSettings(s);
+    setReviews(Array.isArray(rv) ? rv : []);
+    setReport(rp);
   }
 
   async function login(e){
@@ -118,6 +124,15 @@ export default function AdminPage(){
   }
   async function deleteCoupon(code){ await fetch(`/api/coupons/${code}`, {method:"DELETE"}); await loadAll(); }
 
+  async function setReviewApproval(id, approved){
+    await fetch(`/api/reviews/${id}`, { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({approved}) });
+    await loadAll();
+  }
+  async function deleteReview(id){
+    await fetch(`/api/reviews/${id}`, { method:"DELETE" });
+    await loadAll();
+  }
+
   async function updateOrderStatus(id, status){
     await fetch(`/api/orders/${id}`, { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status}) });
     await loadAll();
@@ -153,12 +168,15 @@ export default function AdminPage(){
   }
 
   const tabs = [
+    {id:"dashboard",label:"لوحة المعلومات",icon:LayoutDashboard},
     {id:"products",label:"المنتجات",icon:Package},
     {id:"categories",label:"الأقسام",icon:LayoutGrid},
     {id:"coupons",label:"الكوبونات",icon:Ticket},
     {id:"orders",label:"الطلبات",icon:Tag},
+    {id:"reviews",label:"التقييمات",icon:Star},
     {id:"settings",label:"الإعدادات",icon:SettingsIcon},
   ];
+  const newOrdersCount = orders.filter(o=>o.status==="جديد").length;
 
   return (
     <div className="kh-root">
@@ -170,13 +188,79 @@ export default function AdminPage(){
             {tabs.map(t=>(
               <button key={t.id} className={"kh-admin-nav-item"+(tab===t.id?" active":"")} onClick={()=>setTab(t.id)}>
                 <t.icon size={16}/> {t.label}
+                {t.id==="orders" && newOrdersCount>0 && <span className="kh-nav-badge">{newOrdersCount}</span>}
+                {t.id==="reviews" && report?.pendingReviews>0 && <span className="kh-nav-badge">{report.pendingReviews}</span>}
               </button>
             ))}
           </nav>
           <button className="kh-admin-nav-item exit" onClick={logout}><LogOut size={16}/> خروج</button>
         </aside>
         <main className="kh-admin-main">
-          <div className="kh-admin-topbar"><h2>{tabs.find(t=>t.id===tab)?.label}</h2></div>
+          <div className="kh-admin-topbar">
+            <h2>{tabs.find(t=>t.id===tab)?.label}</h2>
+            {newOrdersCount>0 && (
+              <button className="kh-admin-bell" onClick={()=>setTab("orders")}>
+                <Bell size={16}/> {newOrdersCount} طلب جديد
+              </button>
+            )}
+          </div>
+
+          {tab==="dashboard" && (
+            <div>
+              {!report ? <p className="kh-muted">جارِ تحميل الإحصائيات...</p> : (
+                <>
+                  <div className="kh-stat-grid">
+                    <div className="kh-stat-card">
+                      <Tag size={18} color="var(--olive)"/>
+                      <div><strong>{report.totalOrders}</strong><span>الطلبات</span></div>
+                    </div>
+                    <div className="kh-stat-card">
+                      <DollarSign size={18} color="var(--olive)"/>
+                      <div><strong>{egp(report.totalRevenue)} ج.م</strong><span>المبيعات</span></div>
+                    </div>
+                    <div className="kh-stat-card">
+                      <ShoppingBag size={18} color="var(--olive)"/>
+                      <div><strong>{report.totalProducts}</strong><span>المنتجات</span></div>
+                    </div>
+                    <div className="kh-stat-card">
+                      <Users size={18} color="var(--olive)"/>
+                      <div><strong>{report.totalCustomers}</strong><span>العملاء</span></div>
+                    </div>
+                  </div>
+
+                  <div style={{display:"grid", gridTemplateColumns:"1.4fr 1fr", gap:20, marginTop:24}}>
+                    <div>
+                      <h3 style={{fontSize:"1rem", marginBottom:12}}>آخر الطلبات</h3>
+                      <div className="kh-table-wrap">
+                        <table className="kh-table">
+                          <thead><tr><th>الطلب</th><th>العميل</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+                          <tbody>
+                            {report.recentOrders.map(o=>(
+                              <tr key={o.id}>
+                                <td>{o.order_number}</td>
+                                <td>{o.customer?.name}</td>
+                                <td>{egp(o.total)} ج.م</td>
+                                <td><span className={"kh-status"+(o.status==="تم التسليم"?" ok":"")}>{o.status}</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 style={{fontSize:"1rem", marginBottom:12}}>الأكثر مبيعاً</h3>
+                      <div className="kh-cat-list">
+                        {report.topProducts.length===0 && <p className="kh-muted">لسه مفيش بيانات كفاية.</p>}
+                        {report.topProducts.map((p,i)=>(
+                          <div key={i} className="kh-cat-item"><span>{i+1}. {p.name}</span><strong>{p.qty}</strong></div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {tab==="products" && (
             <div>
@@ -287,6 +371,31 @@ export default function AdminPage(){
                     <ul>{(o.items||[]).map((it,i)=><li key={i}>{it.name} × {it.qty} — {egp(it.price*it.qty)} ج.م</li>)}</ul>
                     <div className="kh-order-total">
                       الإجمالي: {egp(o.total)} ج.م (شحن {egp(o.shipping_cost)} ج.م) {o.coupon_code && `(كوبون ${o.coupon_code})`} — الدفع عند الاستلام
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {tab==="reviews" && (
+            reviews.length===0 ? <div className="kh-empty">لسه مفيش تقييمات.</div> : (
+              <div className="kh-orders">
+                {reviews.map(r=>(
+                  <div key={r.id} className="kh-order-card">
+                    <div className="kh-order-head">
+                      <strong>{r.product_name || `منتج #${r.product_id}`}</strong>
+                      <span>{new Date(r.created_at).toLocaleDateString("ar-EG")}</span>
+                      <span className={"kh-status"+(r.approved?" ok":"")}>{r.approved ? "منشور" : "بانتظار المراجعة"}</span>
+                    </div>
+                    <div className="kh-order-customer">
+                      {"⭐".repeat(r.rating)} — {r.name}
+                    </div>
+                    {r.comment && <p style={{fontSize:".85rem", color:"var(--ink-soft)", margin:"6px 0"}}>{r.comment}</p>}
+                    <div style={{display:"flex", gap:8, marginTop:10}}>
+                      {!r.approved && <button className="kh-btn kh-btn-primary" style={{padding:"7px 16px", fontSize:".8rem"}} onClick={()=>setReviewApproval(r.id,true)}>نشر</button>}
+                      {r.approved && <button className="kh-btn kh-btn-ghost" style={{padding:"7px 16px", fontSize:".8rem"}} onClick={()=>setReviewApproval(r.id,false)}>إخفاء</button>}
+                      <button className="kh-btn kh-btn-ghost" style={{padding:"7px 16px", fontSize:".8rem", color:"var(--terracotta-deep)"}} onClick={()=>deleteReview(r.id)}>حذف</button>
                     </div>
                   </div>
                 ))}
