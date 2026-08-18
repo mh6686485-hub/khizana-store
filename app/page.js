@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, ImageOff, Lock } from "lucide-react";
+import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, ImageOff, Lock, Truck, ShieldCheck, Headphones, Wallet, Leaf } from "lucide-react";
 import Link from "next/link";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
@@ -27,6 +27,47 @@ function ProductImage({src,alt,className}){
   if(!src) return <div className={className+" kh-img-placeholder"}><ImageOff size={26}/></div>;
   return <img src={src} alt={alt} className={className} style={{objectFit:"cover"}} />;
 }
+
+/* Decorative hero illustration — inline SVG so no external image/hosting is needed. */
+function HeroIllustration(){
+  return (
+    <svg viewBox="0 0 400 320" width="100%" height="100%" role="img" aria-label="أدوات منزلية على رف">
+      <rect x="0" y="0" width="400" height="320" fill="var(--white)"/>
+      <rect x="30" y="230" width="340" height="8" rx="4" fill="var(--cream-deep)"/>
+      <rect x="60" y="238" width="8" height="46" fill="var(--cream-deep)"/>
+      <rect x="332" y="238" width="8" height="46" fill="var(--cream-deep)"/>
+      <g>
+        <rect x="70" y="150" width="70" height="80" rx="10" fill="var(--olive)"/>
+        <rect x="70" y="150" width="70" height="16" rx="8" fill="var(--olive-deep)"/>
+        <circle cx="105" cy="140" r="10" fill="var(--olive-deep)"/>
+      </g>
+      <g>
+        <rect x="155" y="120" width="60" height="110" rx="14" fill="var(--white)" stroke="var(--cream-deep)" strokeWidth="3"/>
+        <rect x="155" y="120" width="60" height="18" rx="9" fill="var(--terracotta)"/>
+        <circle cx="175" cy="170" r="5" fill="var(--cream-deep)"/>
+        <circle cx="195" cy="185" r="5" fill="var(--cream-deep)"/>
+        <circle cx="180" cy="200" r="5" fill="var(--cream-deep)"/>
+      </g>
+      <g>
+        <ellipse cx="260" cy="215" rx="45" ry="15" fill="var(--olive-deep)"/>
+        <rect x="215" y="170" width="90" height="50" rx="18" fill="var(--olive)"/>
+        <rect x="205" y="185" width="14" height="10" rx="5" fill="var(--olive)"/>
+        <rect x="301" y="185" width="14" height="10" rx="5" fill="var(--olive)"/>
+      </g>
+      <g>
+        <rect x="325" y="165" width="34" height="65" rx="8" fill="var(--white)" stroke="var(--cream-deep)" strokeWidth="3"/>
+        <path d="M330 165 Q342 140 354 165" fill="none" stroke="var(--olive)" strokeWidth="4" strokeLinecap="round"/>
+      </g>
+      <g>
+        <circle cx="345" cy="120" r="22" fill="var(--cream-deep)"/>
+        <path d="M345 132c-10 0-16-8-16-16 8 0 16 6 16 16Zm0 0c10 0 16-8 16-16-8 0-16 6-16 16Z" fill="var(--olive)"/>
+        <rect x="343" y="130" width="4" height="18" fill="var(--olive)"/>
+      </g>
+    </svg>
+  );
+}
+
+const NAV_CATS_EXTRA = ["عروض خِزانة"];
 
 export default function StorePage(){
   const [products,setProducts] = useState([]);
@@ -79,6 +120,7 @@ export default function StorePage(){
   const couponDiscount = appliedCoupon ? Math.round(subtotal*appliedCoupon.discount_percent/100) : 0;
   const total = Math.max(0, subtotal-couponDiscount);
   const cartCount = cart.reduce((s,c)=>s+c.qty,0);
+  const wishlistCount = wishlist.length;
 
   function addToCart(productId, qty=1){
     setCart(prev=>{
@@ -123,35 +165,117 @@ export default function StorePage(){
     showToast("تم إرسال طلبك، هنتواصل معاك على واتساب");
   }
 
+  function goCategory(name){
+    setActiveCategory(name);
+    document.getElementById("products-section")?.scrollIntoView({behavior:"smooth"});
+  }
+  function goHome(){
+    setActiveCategory("الكل");
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+  function goOffers(){
+    const el = document.getElementById("offers-section") || document.getElementById("products-section");
+    el?.scrollIntoView({behavior:"smooth"});
+  }
+
   if(loading) return <div className="kh-root kh-loading">جارِ تحميل {settings.store_name}...</div>;
 
   return (
     <div className="kh-root">
       {toast && <div className="kh-toast">{toast}</div>}
 
+      <div className="kh-topbar">
+        <div className="kh-topbar-inner">
+          <span className="kh-topbar-item"><Truck size={14}/> توصيل لجميع محافظات مصر</span>
+          <span className="kh-topbar-item"><ShieldCheck size={14}/> ضمان جودة على جميع المنتجات</span>
+        </div>
+      </div>
+
       <header className="kh-header">
         <div className="kh-wrap kh-header-inner">
-          <div className="kh-logo"><span className="kh-dot"/>{settings.store_name}</div>
+          <div className="kh-logo-wrap">
+            <div className="kh-logo-text">
+              <h1>خِزانة</h1>
+              <div className="kh-logo-tagline">كل أدوات بيتك في مكان واحد</div>
+            </div>
+          </div>
           <div className="kh-search">
             <Search size={16}/>
             <input placeholder="ابحث عن منتج..." value={search} onChange={e=>setSearch(e.target.value)} />
           </div>
-          <button className="kh-icon-btn" onClick={()=>setCartOpen(true)} aria-label="السلة">
-            <ShoppingCart size={19}/>
-            {cartCount>0 && <span className="kh-badge">{cartCount}</span>}
-          </button>
+          <div className="kh-header-actions">
+            <Link href="/admin" className="kh-action-btn">
+              <Lock size={19}/> الإدارة
+            </Link>
+            <button className="kh-action-btn" onClick={()=>{}} aria-label="المفضلة">
+              <span style={{position:"relative"}}>
+                <Heart size={19}/>
+                {wishlistCount>0 && <span className="kh-badge">{wishlistCount}</span>}
+              </span>
+              المفضلة
+            </button>
+            <button className="kh-action-btn" onClick={()=>setCartOpen(true)} aria-label="السلة">
+              <span style={{position:"relative"}}>
+                <ShoppingCart size={19}/>
+                {cartCount>0 && <span className="kh-badge">{cartCount}</span>}
+              </span>
+              السلة
+            </button>
+          </div>
         </div>
       </header>
 
-      <section className="kh-wrap kh-hero">
-        <div className="kh-eyebrow">توصيل لجميع محافظات مصر</div>
-        <h1>كل حاجة يحتاجها بيتك، مرتّبة في مكان واحد</h1>
-        <p className="kh-lead">من المطبخ للتخزين للتنظيف — أدوات منزلك بجودة نضمنها وأسعار تناسب كل بيت.</p>
+      <nav className="kh-catnav">
+        <div className="kh-catnav-inner">
+          <button className={"kh-catnav-item"+(activeCategory==="الكل"?" active":"")} onClick={goHome}>الرئيسية</button>
+          {categories.map(c=>(
+            <button key={c.id} className={"kh-catnav-item"+(activeCategory===c.name?" active":"")} onClick={()=>goCategory(c.name)}>{c.name}</button>
+          ))}
+          <button className="kh-catnav-item" onClick={goOffers}>عروض خِزانة</button>
+        </div>
+      </nav>
+
+      <section className="kh-hero-section">
+        <div className="kh-wrap kh-hero">
+          <div>
+            <div className="kh-eyebrow">توصيل لجميع محافظات مصر</div>
+            <h1>كل حاجة يحتاجها بيتك، <span className="accent">مرتّبة</span> في مكان واحد</h1>
+            <p className="kh-lead">من المطبخ للتخزين والتنظيم — أدوات منزلك بجودة تضمنها وأسعار تناسب كل بيت.</p>
+            <div className="kh-hero-actions">
+              <button className="kh-btn kh-btn-primary" onClick={()=>document.getElementById("products-section")?.scrollIntoView({behavior:"smooth"})}>
+                <ShoppingCart size={16}/> تسوق الآن
+              </button>
+              <button className="kh-btn kh-btn-outline-terracotta" onClick={goOffers}>عروض خِزانة</button>
+            </div>
+          </div>
+          <div className="kh-hero-visual"><HeroIllustration/></div>
+        </div>
+      </section>
+
+      <section className="kh-benefits">
+        <div className="kh-wrap kh-benefits-grid">
+          <div className="kh-benefit">
+            <div className="kh-benefit-icon"><Truck size={20}/></div>
+            <div><h5>توصيل سريع</h5><p>في جميع المحافظات</p></div>
+          </div>
+          <div className="kh-benefit">
+            <div className="kh-benefit-icon"><Headphones size={20}/></div>
+            <div><h5>خدمة عملاء مميزة</h5><p>نحن هنا لمساعدتك</p></div>
+          </div>
+          <div className="kh-benefit">
+            <div className="kh-benefit-icon"><ShieldCheck size={20}/></div>
+            <div><h5>ضمان جودة</h5><p>على جميع المنتجات</p></div>
+          </div>
+          <div className="kh-benefit">
+            <div className="kh-benefit-icon"><Wallet size={20}/></div>
+            <div><h5>الدفع عند الاستلام</h5><p>ادفع عند استلام طلبك</p></div>
+          </div>
+        </div>
       </section>
 
       {offerProducts.length>0 && (
-        <section className="kh-wrap kh-section">
-          <div className="kh-section-head"><div className="kh-eyebrow">عروض اليوم</div><h2>هتفوتك لو اتأخرت</h2></div>
+        <section id="offers-section" className="kh-wrap kh-section">
+          <div className="kh-section-head"><h2>عروض خِزانة — هتفوتك لو اتأخرت</h2></div>
           <div className="kh-prod-grid">
             {offerProducts.map(p=>(
               <ProductCard key={p.id} product={p} inWishlist={wishlist.includes(p.id)} onToggleWishlist={()=>toggleWishlist(p.id)} onAdd={()=>addToCart(p.id)} onOpen={()=>setSelectedProduct(p)} showOffer/>
@@ -160,7 +284,10 @@ export default function StorePage(){
         </section>
       )}
 
-      <section className="kh-wrap kh-section" style={{paddingTop: offerProducts.length?0:undefined}}>
+      <section id="products-section" className="kh-wrap kh-section">
+        <div className="kh-section-head">
+          <h2><Leaf size={20} style={{verticalAlign:"-3px", color:"var(--olive)"}}/> الأكثر مبيعاً</h2>
+        </div>
         <div className="kh-chips">
           <button className={"kh-chip"+(activeCategory==="الكل"?" active":"")} onClick={()=>setActiveCategory("الكل")}>الكل</button>
           {categories.map(c=>(
@@ -206,13 +333,14 @@ export default function StorePage(){
 
 function ProductCard({product,inWishlist,onToggleWishlist,onAdd,onOpen,showOffer}){
   const disc = discountPercent(product.price, product.original_price);
+  const available = product.status === "available";
   return (
-    <div className="kh-prod-card">
+    <div className={"kh-prod-card"+(available?"":" unavailable")}>
       <div className="kh-prod-media" onClick={onOpen} role="button" tabIndex={0}>
         <ProductImage src={product.image} alt={product.name} className="kh-prod-img"/>
         {product.is_best_seller && <span className="kh-tag kh-tag-sage">الأكثر مبيعاً</span>}
         {product.is_new && !product.is_best_seller && <span className="kh-tag kh-tag-brass">جديد</span>}
-        {disc>0 && <span className="kh-tag kh-tag-copper" style={{left:10,right:"auto"}}>خصم {disc}%</span>}
+        {disc>0 && <span className="kh-tag kh-tag-copper" style={{left:12,right:"auto"}}>خصم {disc}%</span>}
         <button className={"kh-heart"+(inWishlist?" active":"")} onClick={e=>{e.stopPropagation();onToggleWishlist();}} aria-label="مفضلة">
           <Heart size={16} fill={inWishlist?"currentColor":"none"}/>
         </button>
@@ -226,7 +354,7 @@ function ProductCard({product,inWishlist,onToggleWishlist,onAdd,onOpen,showOffer
             <div className="kh-price">{egp(product.price)} <small>ج.م</small></div>
             {disc>0 && <div className="kh-price-old">{egp(product.original_price)} ج.م</div>}
           </div>
-          <button className="kh-icon-btn kh-icon-btn-fill" onClick={onAdd} aria-label="أضف للسلة"><ShoppingCart size={16}/></button>
+          <button className="kh-icon-btn kh-icon-btn-fill" onClick={onAdd} aria-label="أضف للسلة" disabled={!available}><ShoppingCart size={16}/></button>
         </div>
       </div>
     </div>
@@ -236,6 +364,7 @@ function ProductCard({product,inWishlist,onToggleWishlist,onAdd,onOpen,showOffer
 function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,toggleWishlist}){
   const [qty,setQty] = useState(1);
   const disc = discountPercent(product.price, product.original_price);
+  const available = product.status === "available";
   function orderNow(){
     const msg = `مرحباً، حابب أطلب:\n${product.name} (${product.code}) × ${qty}\nالسعر: ${egp(product.price*qty)} ج.م\nمن ${storeName}`;
     window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
@@ -250,11 +379,14 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
             <span className="kh-prod-code">{product.code}</span>
             <h2>{product.name}</h2>
             <div className="kh-detail-price-row">
-              <span className="kh-price" style={{fontSize:"1.5rem"}}>{egp(product.price)} <small>ج.م</small></span>
+              <span className="kh-price" style={{fontSize:"1.6rem"}}>{egp(product.price)} <small>ج.م</small></span>
               {disc>0 && <span className="kh-price-old">{egp(product.original_price)} ج.م</span>}
               {disc>0 && <span className="kh-tag kh-tag-copper" style={{position:"static"}}>خصم {disc}%</span>}
             </div>
-            {product.offer_expiry && <Countdown expiry={product.offer_expiry}/>}
+            <span className={"kh-avail "+(available?"ok":"out")}>
+              {available ? <><Check size={14}/> متوفر في المخزون</> : "غير متوفر حاليًا"}
+            </span>
+            {product.offer_expiry && <div style={{marginTop:6}}><Countdown expiry={product.offer_expiry}/></div>}
             <p className="kh-detail-desc">{product.description}</p>
             {product.specs && (
               <ul className="kh-specs">{product.specs.split("\n").filter(Boolean).map((s,i)=><li key={i}><Check size={14}/> {s}</li>)}</ul>
@@ -265,7 +397,7 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
               <button onClick={()=>setQty(q=>q+1)}><Plus size={14}/></button>
             </div>
             <div className="kh-detail-actions">
-              <button className="kh-btn kh-btn-primary" onClick={()=>onAdd(qty)}>أضف للسلة</button>
+              <button className="kh-btn kh-btn-primary" onClick={()=>onAdd(qty)} disabled={!available}>أضف للسلة</button>
               <button className="kh-btn kh-btn-sage" onClick={orderNow}>اطلب عبر واتساب</button>
               <button className={"kh-btn kh-btn-ghost-icon"+(inWishlist?" active":"")} onClick={toggleWishlist} aria-label="مفضلة">
                 <Heart size={17} fill={inWishlist?"currentColor":"none"}/>
