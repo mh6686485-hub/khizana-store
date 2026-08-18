@@ -47,6 +47,25 @@ export async function POST(req) {
         shippingCost,
       ]
     );
+
+    // Deduct stock for each item (never goes below zero).
+    for (const item of b.items || []) {
+      if (item.productId) {
+        await p.query(
+          "UPDATE products SET stock = GREATEST(stock - $1, 0) WHERE id = $2",
+          [Number(item.qty) || 1, item.productId]
+        );
+      }
+    }
+
+    // Track coupon usage.
+    if (b.couponCode) {
+      await p.query(
+        "UPDATE coupons SET used_count = used_count + 1 WHERE code = $1",
+        [b.couponCode]
+      );
+    }
+
     return NextResponse.json(rows[0]);
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

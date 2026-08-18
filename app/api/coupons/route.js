@@ -18,9 +18,9 @@ export async function POST(req) {
     const b = await req.json();
     const p = await db();
     const { rows } = await p.query(
-      `INSERT INTO coupons (code, discount_percent, min_order, expiry, active)
-       VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (code) DO UPDATE SET discount_percent=$2, min_order=$3, expiry=$4, active=$5
+      `INSERT INTO coupons (code, discount_percent, min_order, expiry, active, discount_type, max_uses)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (code) DO UPDATE SET discount_percent=$2, min_order=$3, expiry=$4, active=$5, discount_type=$6, max_uses=$7
        RETURNING *`,
       [
         String(b.code).toUpperCase(),
@@ -28,6 +28,8 @@ export async function POST(req) {
         Number(b.minOrder) || 0,
         b.expiry || null,
         b.active !== false,
+        b.discountType === "fixed" ? "fixed" : "percent",
+        b.maxUses ? Number(b.maxUses) : null,
       ]
     );
     return NextResponse.json(rows[0]);

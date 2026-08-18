@@ -18,14 +18,16 @@ export async function POST(req) {
     const b = await req.json();
     const p = await db();
     const { rows } = await p.query(
-      `INSERT INTO products (code,name,category,price,original_price,description,specs,image,status,is_new,is_best_seller,offer_expiry)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      `INSERT INTO products (code,name,category,price,original_price,description,specs,image,status,is_new,is_best_seller,offer_expiry,stock,min_stock)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [
         b.code, b.name, b.category, Number(b.price) || 0,
         b.originalPrice ? Number(b.originalPrice) : Number(b.price) || 0,
         b.description || "", b.specs || "", b.image || "",
         b.status || "available", !!b.isNew, !!b.isBestSeller,
         b.offerExpiry || null,
+        Number.isFinite(Number(b.stock)) ? Number(b.stock) : 20,
+        Number.isFinite(Number(b.minStock)) ? Number(b.minStock) : 5,
       ]
     );
     return NextResponse.json(rows[0]);

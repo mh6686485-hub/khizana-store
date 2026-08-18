@@ -118,7 +118,11 @@ export default function StorePage(){
     return p ? {...c, product:p} : null;
   }).filter(Boolean);
   const subtotal = cartLines.reduce((s,l)=>s+Number(l.product.price)*l.qty,0);
-  const couponDiscount = appliedCoupon ? Math.round(subtotal*appliedCoupon.discount_percent/100) : 0;
+  const couponDiscount = appliedCoupon
+    ? (appliedCoupon.discount_type === "fixed"
+        ? Math.min(Number(appliedCoupon.discount_percent), subtotal)
+        : Math.round(subtotal*appliedCoupon.discount_percent/100))
+    : 0;
   const total = Math.max(0, subtotal-couponDiscount);
   const cartCount = cart.reduce((s,c)=>s+c.qty,0);
   const wishlistCount = wishlist.length;
@@ -144,6 +148,7 @@ export default function StorePage(){
     if(!found) return setCouponMsg("الكود غير صحيح");
     if(!found.active) return setCouponMsg("الكود غير مفعّل");
     if(found.expiry && new Date(found.expiry)<new Date()) return setCouponMsg("الكود منتهي الصلاحية");
+    if(found.max_uses && Number(found.used_count) >= Number(found.max_uses)) return setCouponMsg("انتهت الكمية المتاحة لهذا الكوبون");
     if(subtotal < Number(found.min_order)) return setCouponMsg(`الحد الأدنى للطلب ${egp(found.min_order)} ج.م`);
     setAppliedCoupon(found);
     setCouponMsg("تم تطبيق الكوبون بنجاح");
@@ -354,7 +359,9 @@ export default function StorePage(){
 
 function ProductCard({product,inWishlist,onToggleWishlist,onAdd,onOpen,showOffer}){
   const disc = discountPercent(product.price, product.original_price);
-  const available = product.status === "available";
+  const stock = Number(product.stock ?? 20);
+  const available = product.status === "available" && stock > 0;
+  const lowStock = available && stock <= Number(product.min_stock ?? 5);
   return (
     <div className={"kh-prod-card"+(available?"":" unavailable")}>
       <div className="kh-prod-media" onClick={onOpen} role="button" tabIndex={0}>
@@ -370,6 +377,8 @@ function ProductCard({product,inWishlist,onToggleWishlist,onAdd,onOpen,showOffer
         <span className="kh-prod-code">{product.code}</span>
         <h4 onClick={onOpen} role="button" tabIndex={0}>{product.name}</h4>
         {showOffer && product.offer_expiry && <Countdown expiry={product.offer_expiry}/>}
+        {!available && <div className="kh-avail out" style={{marginBottom:4}}>نفد من المخزون</div>}
+        {lowStock && <div className="kh-avail out" style={{marginBottom:4}}>متبقي {stock} فقط</div>}
         <div className="kh-price-row">
           <div>
             <div className="kh-price">{egp(product.price)} <small>ج.م</small></div>
@@ -385,7 +394,9 @@ function ProductCard({product,inWishlist,onToggleWishlist,onAdd,onOpen,showOffer
 function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,toggleWishlist}){
   const [qty,setQty] = useState(1);
   const disc = discountPercent(product.price, product.original_price);
-  const available = product.status === "available";
+  const stock = Number(product.stock ?? 20);
+  const available = product.status === "available" && stock > 0;
+  const lowStock = available && stock <= Number(product.min_stock ?? 5);
   function orderNow(){
     const msg = `مرحباً، حابب أطلب:\n${product.name} (${product.code}) × ${qty}\nالسعر: ${egp(product.price*qty)} ج.م\nمن ${storeName}`;
     window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
@@ -405,7 +416,7 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
               {disc>0 && <span className="kh-tag kh-tag-copper" style={{position:"static"}}>خصم {disc}%</span>}
             </div>
             <span className={"kh-avail "+(available?"ok":"out")}>
-              {available ? <><Check size={14}/> متوفر في المخزون</> : "غير متوفر حاليًا"}
+              {available ? <><Check size={14}/> متوفر في المخزون{lowStock ? ` — متبقي ${stock} فقط` : ""}</> : "نفد من المخزون"}
             </span>
             {product.offer_expiry && <div style={{marginTop:6}}><Countdown expiry={product.offer_expiry}/></div>}
             <p className="kh-detail-desc">{product.description}</p>
@@ -415,7 +426,7 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
             <div className="kh-qty-row">
               <button onClick={()=>setQty(q=>Math.max(1,q-1))}><Minus size={14}/></button>
               <span>{qty}</span>
-              <button onClick={()=>setQty(q=>q+1)}><Plus size={14}/></button>
+              <button onClick={()=>setQty(q=>Math.min(stock||99, q+1))}><Plus size={14}/></button>
             </div>
             <div className="kh-detail-actions">
               <button className="kh-btn kh-btn-primary" onClick={()=>onAdd(qty)} disabled={!available}>أضف للسلة</button>

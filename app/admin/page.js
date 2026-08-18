@@ -35,7 +35,7 @@ export default function AdminPage(){
   const [showForm,setShowForm] = useState(false);
   const [editing,setEditing] = useState(null);
   const [newCategoryName,setNewCategoryName] = useState("");
-  const [couponForm,setCouponForm] = useState({code:"",discountPercent:10,minOrder:0,expiry:"",active:true});
+  const [couponForm,setCouponForm] = useState({code:"",discountPercent:10,minOrder:0,expiry:"",active:true,discountType:"percent",maxUses:""});
 
   function showToast(msg){ setToast(msg); setTimeout(()=>setToast(""),2600); }
 
@@ -73,7 +73,7 @@ export default function AdminPage(){
   }
 
   function openNewProduct(){
-    setEditing({ id:null, code:"", name:"", category: categories[0]?.name || "", price:"", originalPrice:"", description:"", specs:"", image:"", status:"available", isNew:false, isBestSeller:false, offerExpiry:"" });
+    setEditing({ id:null, code:"", name:"", category: categories[0]?.name || "", price:"", originalPrice:"", description:"", specs:"", image:"", status:"available", isNew:false, isBestSeller:false, offerExpiry:"", stock:20, minStock:5 });
     setShowForm(true);
   }
   function openEditProduct(p){
@@ -81,6 +81,7 @@ export default function AdminPage(){
       id:p.id, code:p.code, name:p.name, category:p.category, price:p.price, originalPrice:p.original_price,
       description:p.description, specs:p.specs, image:p.image, status:p.status, isNew:p.is_new, isBestSeller:p.is_best_seller,
       offerExpiry: p.offer_expiry ? String(p.offer_expiry).slice(0,16) : "",
+      stock: p.stock ?? 20, minStock: p.min_stock ?? 5,
     });
     setShowForm(true);
   }
@@ -108,7 +109,7 @@ export default function AdminPage(){
   async function addCoupon(){
     if(!couponForm.code.trim()){ showToast("أدخل كود الكوبون"); return; }
     await fetch("/api/coupons", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(couponForm) });
-    setCouponForm({code:"",discountPercent:10,minOrder:0,expiry:"",active:true});
+    setCouponForm({code:"",discountPercent:10,minOrder:0,expiry:"",active:true,discountType:"percent",maxUses:""});
     await loadAll(); showToast("تم إضافة الكوبون");
   }
   async function toggleCouponActive(c){
@@ -182,20 +183,27 @@ export default function AdminPage(){
               <button className="kh-btn kh-btn-primary" onClick={openNewProduct} style={{marginBottom:18}}><Plus size={15}/> إضافة منتج</button>
               <div className="kh-table-wrap">
                 <table className="kh-table">
-                  <thead><tr><th>الصورة</th><th>الكود</th><th>الاسم</th><th>القسم</th><th>السعر</th><th>الحالة</th><th></th></tr></thead>
+                  <thead><tr><th>الصورة</th><th>الكود</th><th>الاسم</th><th>القسم</th><th>السعر</th><th>المخزون</th><th>الحالة</th><th></th></tr></thead>
                   <tbody>
-                    {products.map(p=>(
-                      <tr key={p.id}>
-                        <td><ProductImage src={p.image} alt={p.name} className="kh-table-img"/></td>
-                        <td>{p.code}</td><td>{p.name}</td><td>{p.category}</td>
-                        <td>{egp(p.price)} ج.م</td>
-                        <td><span className={"kh-status"+(p.status==="available"?" ok":"")}>{p.status==="available"?"متاح":"غير متاح"}</span></td>
-                        <td className="kh-table-actions">
-                          <button onClick={()=>openEditProduct(p)}><Pencil size={15}/></button>
-                          <button onClick={()=>deleteProduct(p.id)}><Trash2 size={15}/></button>
-                        </td>
-                      </tr>
-                    ))}
+                    {products.map(p=>{
+                      const stock = p.stock ?? 20;
+                      const minStock = p.min_stock ?? 5;
+                      const stockLabel = stock<=0 ? "نفد" : stock<=minStock ? `منخفض (${stock})` : stock;
+                      const stockClass = stock<=0 ? "" : stock<=minStock ? "" : " ok";
+                      return (
+                        <tr key={p.id}>
+                          <td><ProductImage src={p.image} alt={p.name} className="kh-table-img"/></td>
+                          <td>{p.code}</td><td>{p.name}</td><td>{p.category}</td>
+                          <td>{egp(p.price)} ج.م</td>
+                          <td><span className={"kh-status"+stockClass}>{stockLabel}</span></td>
+                          <td><span className={"kh-status"+(p.status==="available"?" ok":"")}>{p.status==="available"?"متاح":"غير متاح"}</span></td>
+                          <td className="kh-table-actions">
+                            <button onClick={()=>openEditProduct(p)}><Pencil size={15}/></button>
+                            <button onClick={()=>deleteProduct(p.id)}><Trash2 size={15}/></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -220,18 +228,28 @@ export default function AdminPage(){
             <div>
               <div className="kh-form kh-form-grid" style={{maxWidth:640,marginBottom:26}}>
                 <label>الكود<input value={couponForm.code} onChange={e=>setCouponForm({...couponForm,code:e.target.value})} placeholder="KH15"/></label>
-                <label>نسبة الخصم %<input type="number" value={couponForm.discountPercent} onChange={e=>setCouponForm({...couponForm,discountPercent:e.target.value})}/></label>
+                <label>نوع الخصم
+                  <select value={couponForm.discountType} onChange={e=>setCouponForm({...couponForm,discountType:e.target.value})}>
+                    <option value="percent">نسبة مئوية %</option>
+                    <option value="fixed">مبلغ ثابت (ج.م)</option>
+                  </select>
+                </label>
+                <label>{couponForm.discountType==="fixed" ? "قيمة الخصم (ج.م)" : "نسبة الخصم %"}<input type="number" value={couponForm.discountPercent} onChange={e=>setCouponForm({...couponForm,discountPercent:e.target.value})}/></label>
                 <label>الحد الأدنى للطلب<input type="number" value={couponForm.minOrder} onChange={e=>setCouponForm({...couponForm,minOrder:e.target.value})}/></label>
                 <label>تاريخ الانتهاء<input type="date" value={couponForm.expiry} onChange={e=>setCouponForm({...couponForm,expiry:e.target.value})}/></label>
+                <label>الحد الأقصى للاستخدام (اختياري)<input type="number" value={couponForm.maxUses} onChange={e=>setCouponForm({...couponForm,maxUses:e.target.value})} placeholder="بدون حد"/></label>
                 <button className="kh-btn kh-btn-primary kh-span-2" onClick={addCoupon}><Plus size={15}/> إضافة كوبون</button>
               </div>
               <div className="kh-table-wrap">
                 <table className="kh-table">
-                  <thead><tr><th>الكود</th><th>الخصم</th><th>الحد الأدنى</th><th>الانتهاء</th><th>الحالة</th><th></th></tr></thead>
+                  <thead><tr><th>الكود</th><th>الخصم</th><th>الحد الأدنى</th><th>الاستخدام</th><th>الانتهاء</th><th>الحالة</th><th></th></tr></thead>
                   <tbody>
                     {coupons.map(c=>(
                       <tr key={c.code}>
-                        <td>{c.code}</td><td>{c.discount_percent}%</td><td>{egp(c.min_order)} ج.م</td>
+                        <td>{c.code}</td>
+                        <td>{c.discount_type==="fixed" ? `${egp(c.discount_percent)} ج.م` : `${c.discount_percent}%`}</td>
+                        <td>{egp(c.min_order)} ج.م</td>
+                        <td>{c.used_count || 0}{c.max_uses ? ` / ${c.max_uses}` : ""}</td>
                         <td>{c.expiry ? String(c.expiry).slice(0,10) : "—"}</td>
                         <td><button className={"kh-status"+(c.active?" ok":"")} onClick={()=>toggleCouponActive(c)}>{c.active?"مفعّل":"متوقف"}</button></td>
                         <td className="kh-table-actions"><button onClick={()=>deleteCoupon(c.code)}><Trash2 size={15}/></button></td>
@@ -325,6 +343,8 @@ function ProductFormModal({product,setProduct,categories,onCancel,onSave}){
           </label>
           <label>السعر<input type="number" value={product.price} onChange={e=>setProduct({...product,price:e.target.value})}/></label>
           <label>السعر قبل الخصم<input type="number" value={product.originalPrice} onChange={e=>setProduct({...product,originalPrice:e.target.value})}/></label>
+          <label>الكمية بالمخزون<input type="number" value={product.stock} onChange={e=>setProduct({...product,stock:e.target.value})}/></label>
+          <label>حد التنبيه بالنقص<input type="number" value={product.minStock} onChange={e=>setProduct({...product,minStock:e.target.value})}/></label>
           <label className="kh-span-2">وصف المنتج<textarea rows={2} value={product.description} onChange={e=>setProduct({...product,description:e.target.value})}/></label>
           <label className="kh-span-2">المواصفات (سطر لكل مواصفة)<textarea rows={3} value={product.specs} onChange={e=>setProduct({...product,specs:e.target.value})}/></label>
           <div className="kh-span-2">
