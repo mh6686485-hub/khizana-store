@@ -21,9 +21,12 @@ export async function POST(req) {
     const p = await db();
 
     const { rows: sRows } = await p.query(
-      "SELECT shipping_cost, points_per_egp, point_value FROM settings WHERE id=1"
+      "SELECT shipping_cost, points_per_egp, point_value, free_shipping_min FROM settings WHERE id=1"
     );
-    const shippingCost = Number(sRows[0]?.shipping_cost ?? 60);
+    const baseShippingCost = Number(sRows[0]?.shipping_cost ?? 60);
+    const freeShippingMin = Number(sRows[0]?.free_shipping_min ?? 0);
+    const orderSubtotalAfterCoupon = Math.max(0, Number(b.total || 0));
+    const shippingCost = (freeShippingMin > 0 && orderSubtotalAfterCoupon >= freeShippingMin) ? 0 : baseShippingCost;
     const pointsPerEgp = Number(sRows[0]?.points_per_egp ?? 0.1);
     const pointValue = Number(sRows[0]?.point_value ?? 1);
 

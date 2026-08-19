@@ -34,7 +34,7 @@ export default function AdminPage(){
   const [report,setReport] = useState(null);
   const [bundles,setBundles] = useState([]);
   const [customers,setCustomers] = useState([]);
-  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60,points_per_egp:0.1,point_value:1});
+  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60,points_per_egp:0.1,point_value:1,free_shipping_min:0});
 
   const [showForm,setShowForm] = useState(false);
   const [editing,setEditing] = useState(null);
@@ -87,7 +87,7 @@ export default function AdminPage(){
   }
 
   function openNewProduct(){
-    setEditing({ id:null, code:"", name:"", category: categories[0]?.name || "", price:"", originalPrice:"", description:"", specs:"", image:"", status:"available", isNew:false, isBestSeller:false, offerExpiry:"", stock:20, minStock:5 });
+    setEditing({ id:null, code:"", name:"", category: categories[0]?.name || "", price:"", originalPrice:"", description:"", specs:"", image:"", status:"available", isNew:false, isBestSeller:false, offerExpiry:"", stock:20, minStock:5, images:[] });
     setShowForm(true);
   }
   function openEditProduct(p){
@@ -95,7 +95,7 @@ export default function AdminPage(){
       id:p.id, code:p.code, name:p.name, category:p.category, price:p.price, originalPrice:p.original_price,
       description:p.description, specs:p.specs, image:p.image, status:p.status, isNew:p.is_new, isBestSeller:p.is_best_seller,
       offerExpiry: p.offer_expiry ? String(p.offer_expiry).slice(0,16) : "",
-      stock: p.stock ?? 20, minStock: p.min_stock ?? 5,
+      stock: p.stock ?? 20, minStock: p.min_stock ?? 5, images: Array.isArray(p.images) ? p.images : [],
     });
     setShowForm(true);
   }
@@ -147,13 +147,51 @@ export default function AdminPage(){
     showToast("تم تحديث حالة الطلب");
   }
 
+  const [selectedOrderIds,setSelectedOrderIds] = useState([]);
+  const [bulkStatus,setBulkStatus] = useState(ORDER_STATUSES[0]);
+  function toggleOrderSelected(id){
+    setSelectedOrderIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+  }
+  async function applyBulkStatus(){
+    if(selectedOrderIds.length===0) return;
+    await Promise.all(selectedOrderIds.map(id=>
+      fetch(`/api/orders/${id}`, { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status:bulkStatus}) })
+    ));
+    setSelectedOrderIds([]);
+    await loadAll();
+    showToast("تم تحديث حالة الطلبات المحددة");
+  }
+
+  function downloadCsv(filename, rows){
+    const csv = rows.map(row=>row.map(cell=>{
+      const s = String(cell ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+    }).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF"+csv], { type:"text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function exportProductsCsv(){
+    const rows = [["الكود","الاسم","القسم","السعر","المخزون","الحالة"]];
+    products.forEach(p=>rows.push([p.code,p.name,p.category,p.price,p.stock,p.status==="available"?"متاح":"غير متاح"]));
+    downloadCsv("منتجات-خزانة.csv", rows);
+  }
+  function exportOrdersCsv(){
+    const rows = [["رقم الطلب","التاريخ","العميل","الهاتف","الإجمالي","الحالة"]];
+    orders.forEach(o=>rows.push([o.order_number||o.id, new Date(o.created_at).toLocaleDateString("ar-EG"), o.customer?.name, o.customer?.phone, o.total, o.status]));
+    downloadCsv("طلبات-خزانة.csv", rows);
+  }
+
   async function saveSettings(){
     await fetch("/api/settings", {
       method:"PUT", headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         storeName:settings.store_name, whatsapp:settings.whatsapp,
         adminPassword:settings.admin_password, shippingCost:settings.shipping_cost,
-        pointsPerEgp:settings.points_per_egp, pointValue:settings.point_value,
+        pointsPerEgp:settings.points_per_egp, pointValue:settings.point_value, freeShippingMin:settings.free_shipping_min,
       }),
     });
     showToast("تم حفظ الإعدادات");
@@ -327,7 +365,10 @@ export default function AdminPage(){
 
           {tab==="products" && (
             <div>
-              <button className="kh-btn kh-btn-primary" onClick={openNewProduct} style={{marginBottom:18}}><Plus size={15}/> إضافة منتج</button>
+              <div style={{display:"flex", gap:10, marginBottom:18}}>
+                <button className="kh-btn kh-btn-primary" onClick={openNewProduct}><Plus size={15}/> إضافة منتج</button>
+                <button className="kh-btn kh-btn-ghost" onClick={exportProductsCsv}><Upload size={15} style={{transform:"rotate(180deg)"}}/> تصدير Excel</button>
+              </div>
               <div className="kh-table-wrap">
                 <table className="kh-table">
                   <thead><tr><th>الصورة</th><th>الكود</th><th>الاسم</th><th>القسم</th><th>السعر</th><th>المخزون</th><th>الحالة</th><th></th></tr></thead>
@@ -436,36 +477,52 @@ export default function AdminPage(){
           )}
 
           {tab==="orders" && (
-            orders.length===0 ? <div className="kh-empty">لسه معملتش أي طلبات.</div> : (
-              <div className="kh-orders">
-                {orders.map(o=>(
-                  <div key={o.id} className="kh-order-card">
-                    <div className="kh-order-head">
-                      <strong>{o.order_number || o.id}</strong>
-                      <span>{new Date(o.created_at).toLocaleString("ar-EG")}</span>
-                      <select
-                        value={o.status}
-                        onChange={e=>updateOrderStatus(o.id, e.target.value)}
-                        style={{marginRight:"auto", padding:"5px 10px", borderRadius:999, border:"1px solid rgba(53,67,49,.2)", fontSize:".8rem", fontWeight:700, background:"var(--white)"}}
-                      >
-                        {ORDER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div className="kh-order-customer">
-                      {o.customer?.name} — {o.customer?.phone}{o.phone2 ? ` / ${o.phone2}` : ""}
-                    </div>
-                    <div className="kh-order-customer">
-                      {o.governorate}{o.city ? " — "+o.city : ""}{o.area ? " — "+o.area : ""} — {o.customer?.address}
-                      {o.landmark && ` (${o.landmark})`}
-                    </div>
-                    <ul>{(o.items||[]).map((it,i)=><li key={i}>{it.name} × {it.qty} — {egp(it.price*it.qty)} ج.م</li>)}</ul>
-                    <div className="kh-order-total">
-                      الإجمالي: {egp(o.total)} ج.م (شحن {egp(o.shipping_cost)} ج.م) {o.coupon_code && `(كوبون ${o.coupon_code})`} — الدفع عند الاستلام
-                    </div>
-                  </div>
-                ))}
+            <div>
+              <div style={{display:"flex", gap:10, alignItems:"center", marginBottom:16, flexWrap:"wrap"}}>
+                <button className="kh-btn kh-btn-ghost" onClick={exportOrdersCsv}><Upload size={15} style={{transform:"rotate(180deg)"}}/> تصدير Excel</button>
+                {selectedOrderIds.length>0 && (
+                  <>
+                    <span className="kh-muted">{selectedOrderIds.length} طلب محدد</span>
+                    <select value={bulkStatus} onChange={e=>setBulkStatus(e.target.value)}
+                      style={{padding:"7px 12px", borderRadius:8, border:"1px solid rgba(53,67,49,.2)", fontSize:".82rem"}}>
+                      {ORDER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <button className="kh-btn kh-btn-primary" style={{padding:"8px 16px", fontSize:".8rem"}} onClick={applyBulkStatus}>تحديث المحدد</button>
+                  </>
+                )}
               </div>
-            )
+              {orders.length===0 ? <div className="kh-empty">لسه معملتش أي طلبات.</div> : (
+                <div className="kh-orders">
+                  {orders.map(o=>(
+                    <div key={o.id} className="kh-order-card">
+                      <div className="kh-order-head">
+                        <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={()=>toggleOrderSelected(o.id)} style={{width:"auto"}}/>
+                        <strong>{o.order_number || o.id}</strong>
+                        <span>{new Date(o.created_at).toLocaleString("ar-EG")}</span>
+                        <select
+                          value={o.status}
+                          onChange={e=>updateOrderStatus(o.id, e.target.value)}
+                          style={{marginRight:"auto", padding:"5px 10px", borderRadius:999, border:"1px solid rgba(53,67,49,.2)", fontSize:".8rem", fontWeight:700, background:"var(--white)"}}
+                        >
+                          {ORDER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div className="kh-order-customer">
+                        {o.customer?.name} — {o.customer?.phone}{o.phone2 ? ` / ${o.phone2}` : ""}
+                      </div>
+                      <div className="kh-order-customer">
+                        {o.governorate}{o.city ? " — "+o.city : ""}{o.area ? " — "+o.area : ""} — {o.customer?.address}
+                        {o.landmark && ` (${o.landmark})`}
+                      </div>
+                      <ul>{(o.items||[]).map((it,i)=><li key={i}>{it.name} × {it.qty} — {egp(it.price*it.qty)} ج.م</li>)}</ul>
+                      <div className="kh-order-total">
+                        الإجمالي: {egp(o.total)} ج.م (شحن {egp(o.shipping_cost)} ج.م) {o.coupon_code && `(كوبون ${o.coupon_code})`} — الدفع عند الاستلام
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {tab==="reviews" && (
@@ -530,6 +587,7 @@ export default function AdminPage(){
               <label>اسم المتجر<input value={settings.store_name||""} onChange={e=>setSettings({...settings,store_name:e.target.value})}/></label>
               <label>رقم واتساب (بالصيغة الدولية بدون +)<input value={settings.whatsapp||""} onChange={e=>setSettings({...settings,whatsapp:e.target.value})} placeholder="201000000000"/></label>
               <label>تكلفة الشحن (ج.م)<input type="number" value={settings.shipping_cost ?? 60} onChange={e=>setSettings({...settings,shipping_cost:e.target.value})}/></label>
+              <label>شحن مجاني فوق (ج.م) — اتركها صفر لإلغاء الميزة<input type="number" value={settings.free_shipping_min ?? 0} onChange={e=>setSettings({...settings,free_shipping_min:e.target.value})}/></label>
               <label>كلمة مرور لوحة التحكم<input value={settings.admin_password||""} onChange={e=>setSettings({...settings,admin_password:e.target.value})}/></label>
               <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
                 <strong style={{fontSize:".9rem"}}>نقاط الولاء</strong>
@@ -600,6 +658,34 @@ function ProductFormModal({product,setProduct,categories,onCancel,onSave}){
               <label className="kh-upload"><Upload size={16}/> اختر صورة<input type="file" accept="image/*" onChange={handleFile} hidden/></label>
             )}
             {product.image && <img src={product.image} alt="معاينة" className="kh-img-preview"/>}
+          </div>
+
+          <div className="kh-span-2">
+            <strong style={{fontSize:".85rem", color:"var(--ink-soft)"}}>صور إضافية (اختياري)</strong>
+            <div style={{display:"flex", flexWrap:"wrap", gap:10, marginTop:8}}>
+              {(product.images||[]).map((img,i)=>(
+                <div key={i} style={{position:"relative"}}>
+                  <img src={img} alt={`صورة ${i+1}`} className="kh-img-preview" style={{margin:0}}/>
+                  <button type="button" onClick={()=>setProduct({...product, images: product.images.filter((_,idx)=>idx!==i)})}
+                    style={{position:"absolute", top:-6, left:-6, width:22, height:22, borderRadius:"50%", background:"var(--terracotta)", color:"#fff", border:"none", display:"flex", alignItems:"center", justifyContent:"center"}}>
+                    <X size={12}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex", gap:8, marginTop:10}}>
+              <label className="kh-upload" style={{margin:0}}>
+                <Upload size={16}/> إضافة صورة
+                <input type="file" accept="image/*" hidden onChange={async e=>{
+                  const file = e.target.files[0];
+                  if(!file) return;
+                  const b64 = await fileToBase64(file);
+                  setProduct({...product, images:[...(product.images||[]), b64]});
+                  e.target.value = "";
+                }}/>
+              </label>
+              <AddImageUrlField onAdd={url=>setProduct({...product, images:[...(product.images||[]), url]})}/>
+            </div>
           </div>
           <label>عرض ينتهي في (اختياري)<input type="datetime-local" value={product.offerExpiry} onChange={e=>setProduct({...product,offerExpiry:e.target.value})}/></label>
           <div className="kh-checkboxes">
@@ -675,6 +761,18 @@ function BundleFormModal({bundle,setBundle,products,onCancel,onSave,toggleItem,s
         </div>
         <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:16}} onClick={onSave}>💾 حفظ الباقة</button>
       </div>
+    </div>
+  );
+}
+
+function AddImageUrlField({onAdd}){
+  const [value,setValue] = useState("");
+  return (
+    <div style={{display:"flex", gap:6}}>
+      <input placeholder="رابط صورة" value={value} onChange={e=>setValue(e.target.value)}
+        style={{padding:"9px 12px", borderRadius:10, border:"1px solid rgba(53,67,49,.16)", fontSize:".85rem"}}/>
+      <button type="button" className="kh-btn kh-btn-ghost" style={{padding:"9px 14px", fontSize:".8rem"}}
+        onClick={()=>{ if(value.trim()){ onAdd(value.trim()); setValue(""); } }}>إضافة</button>
     </div>
   );
 }

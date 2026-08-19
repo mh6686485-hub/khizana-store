@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, ImageOff, Lock, Truck, ShieldCheck, Headphones, Wallet, Leaf, Star, User, SlidersHorizontal, Package2, Gift } from "lucide-react";
+import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, ImageOff, Lock, Truck, ShieldCheck, Headphones, Wallet, Leaf, Star, User, SlidersHorizontal, Package2, Gift, Share2 } from "lucide-react";
 import Link from "next/link";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
@@ -117,7 +117,18 @@ export default function StorePage(){
   useEffect(()=>{
     const saved = typeof window !== "undefined" ? localStorage.getItem("kh_phone") : null;
     if(saved) setPhone(saved);
+    try{
+      const savedCart = localStorage.getItem("kh_cart");
+      if(savedCart){
+        const parsed = JSON.parse(savedCart);
+        if(Array.isArray(parsed)) setCart(parsed);
+      }
+    }catch(e){}
   },[]);
+
+  useEffect(()=>{
+    try{ localStorage.setItem("kh_cart", JSON.stringify(cart)); }catch(e){}
+  },[cart]);
 
   useEffect(()=>{
     if(!phone) return;
@@ -135,12 +146,19 @@ export default function StorePage(){
           fetch("/api/products"), fetch("/api/categories"), fetch("/api/coupons"), fetch("/api/settings"),
           fetch("/api/bundles"), fetch("/api/reviews/summary"),
         ]);
-        setProducts(await pRes.json());
+        const productsData = await pRes.json();
+        setProducts(productsData);
         setCategories(await cRes.json());
         setCoupons(await cpRes.json());
         setSettings(await sRes.json());
         setBundles(await bRes.json());
         setRatings(await rRes.json());
+
+        const sharedId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("product") : null;
+        if(sharedId){
+          const found = productsData.find(p=>String(p.id)===String(sharedId));
+          if(found) setSelectedProduct(found);
+        }
       }catch(e){ console.error(e); }
       setLoading(false);
     })();
@@ -493,12 +511,13 @@ export default function StorePage(){
         <ProductDetail product={selectedProduct} onClose={()=>setSelectedProduct(null)}
           onAdd={(qty)=>{ addToCart("product",selectedProduct.id,qty); setSelectedProduct(null); }}
           whatsapp={settings.whatsapp} storeName={settings.store_name}
-          inWishlist={wishlist.includes(selectedProduct.id)} toggleWishlist={()=>toggleWishlist(selectedProduct.id)} />
+          inWishlist={wishlist.includes(selectedProduct.id)} toggleWishlist={()=>toggleWishlist(selectedProduct.id)}
+          allProducts={visibleProducts} onOpenRelated={(p)=>setSelectedProduct(p)} />
       )}
 
       {cartOpen && (
         <CartDrawer lines={cartLines} subtotal={subtotal} couponDiscount={couponDiscount} total={total}
-          shippingCost={settings.shipping_cost}
+          shippingCost={settings.shipping_cost} freeShippingMin={settings.free_shipping_min}
           couponInput={couponInput} setCouponInput={setCouponInput} applyCoupon={applyCoupon} couponMsg={couponMsg}
           appliedCoupon={appliedCoupon} updateQty={updateQty} onClose={()=>setCartOpen(false)}
           onCheckout={()=>{ setCartOpen(false); setCheckoutOpen(true); }} />
@@ -506,7 +525,8 @@ export default function StorePage(){
 
       {checkoutOpen && (
         <CheckoutModal onClose={()=>setCheckoutOpen(false)} onSubmit={submitOrder}
-          total={total} shippingCost={settings.shipping_cost} savedPhone={phone} myPoints={myPoints} />
+          total={total} shippingCost={settings.shipping_cost} freeShippingMin={settings.free_shipping_min}
+          savedPhone={phone} myPoints={myPoints} />
       )}
 
       {successOrder && (
@@ -589,7 +609,7 @@ function ProductCard({product,rating,inWishlist,onToggleWishlist,onAdd,onOpen,sh
   );
 }
 
-function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,toggleWishlist}){
+function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,toggleWishlist,allProducts,onOpenRelated}){
   const [qty,setQty] = useState(1);
   const [reviews,setReviews] = useState([]);
   const [reviewsLoading,setReviewsLoading] = useState(true);
@@ -599,6 +619,12 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
   const stock = Number(product.stock ?? 20);
   const available = product.status === "available" && stock > 0;
   const lowStock = available && stock <= Number(product.min_stock ?? 5);
+
+  const gallery = [product.image, ...(Array.isArray(product.images) ? product.images : [])].filter(Boolean);
+  const [activeImage,setActiveImage] = useState(gallery[0] || "");
+  useEffect(()=>{ setActiveImage((product.image ? [product.image] : []).concat(product.images||[]).filter(Boolean)[0] || ""); },[product.id]);
+
+  const related = (allProducts||[]).filter(p=>p.category===product.category && p.id!==product.id).slice(0,4);
 
   useEffect(()=>{
     setReviewsLoading(true);
@@ -625,12 +651,28 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
     const msg = `مرحباً، حابب أطلب:\n${product.name} (${product.code}) × ${qty}\nالسعر: ${egp(product.price*qty)} ج.م\nمن ${storeName}`;
     window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
   }
+  function shareProduct(){
+    const link = typeof window !== "undefined" ? `${window.location.origin}/?product=${product.id}` : "";
+    const msg = `شوف المنتج ده في ${storeName}:\n${product.name} — ${egp(product.price)} ج.م\n${link}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+  }
   return (
     <div className="kh-overlay" onClick={onClose}>
       <div className="kh-modal kh-detail" onClick={e=>e.stopPropagation()}>
         <button className="kh-close" onClick={onClose}><X size={18}/></button>
         <div className="kh-detail-grid">
-          <ProductImage src={product.image} alt={product.name} className="kh-detail-img"/>
+          <div>
+            <ProductImage src={activeImage} alt={product.name} className="kh-detail-img"/>
+            {gallery.length>1 && (
+              <div className="kh-gallery-thumbs">
+                {gallery.map((src,i)=>(
+                  <button key={i} className={"kh-gallery-thumb"+(src===activeImage?" active":"")} onClick={()=>setActiveImage(src)}>
+                    <ProductImage src={src} alt={`${product.name} ${i+1}`} className="kh-gallery-thumb-img"/>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div>
             <span className="kh-prod-code">{product.code}</span>
             <h2>{product.name}</h2>
@@ -664,9 +706,30 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
               <button className={"kh-btn kh-btn-ghost-icon"+(inWishlist?" active":"")} onClick={toggleWishlist} aria-label="مفضلة">
                 <Heart size={17} fill={inWishlist?"currentColor":"none"}/>
               </button>
+              <button className="kh-btn kh-btn-ghost-icon" onClick={shareProduct} aria-label="مشاركة المنتج">
+                <Share2 size={17}/>
+              </button>
             </div>
           </div>
         </div>
+
+        {related.length>0 && (
+          <div className="kh-reviews-section">
+            <h3 style={{fontSize:"1.05rem", marginBottom:14}}>منتجات مشابهة</h3>
+            <div className="kh-related-grid">
+              {related.map(r=>{
+                const rDisc = discountPercent(r.price, r.original_price);
+                return (
+                  <button key={r.id} className="kh-related-card" onClick={()=>onOpenRelated(r)}>
+                    <ProductImage src={r.image} alt={r.name} className="kh-related-img"/>
+                    <span className="kh-related-name">{r.name}</span>
+                    <span className="kh-related-price">{egp(r.price)} ج.م</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="kh-reviews-section">
           <h3 style={{fontSize:"1.05rem", marginBottom:14}}>آراء العملاء</h3>
@@ -707,8 +770,11 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
   );
 }
 
-function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,couponInput,setCouponInput,applyCoupon,couponMsg,appliedCoupon,updateQty,onClose,onCheckout}){
-  const grandTotal = total + Number(shippingCost || 0);
+function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,freeShippingMin,couponInput,setCouponInput,applyCoupon,couponMsg,appliedCoupon,updateQty,onClose,onCheckout}){
+  const qualifiesFreeShipping = Number(freeShippingMin) > 0 && total >= Number(freeShippingMin);
+  const effectiveShipping = qualifiesFreeShipping ? 0 : Number(shippingCost || 0);
+  const grandTotal = total + effectiveShipping;
+  const remainingForFreeShipping = Number(freeShippingMin) > 0 ? Math.max(0, Number(freeShippingMin) - total) : 0;
   return (
     <div className="kh-overlay" onClick={onClose}>
       <div className="kh-drawer" onClick={e=>e.stopPropagation()}>
@@ -734,6 +800,16 @@ function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,couponInpu
         )}
         {lines.length>0 && (
           <>
+            {remainingForFreeShipping>0 && (
+              <div className="kh-free-shipping-note">
+                <Truck size={14}/> ضيف {egp(remainingForFreeShipping)} ج.م كمان واحصل على شحن مجاني!
+              </div>
+            )}
+            {qualifiesFreeShipping && (
+              <div className="kh-free-shipping-note ok">
+                <Truck size={14}/> مبروك، طلبك مؤهل للشحن المجاني!
+              </div>
+            )}
             <div className="kh-coupon-row">
               <input placeholder="كود الخصم" value={couponInput} onChange={e=>setCouponInput(e.target.value)}/>
               <button onClick={applyCoupon}>تطبيق</button>
@@ -742,7 +818,7 @@ function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,couponInpu
             <div className="kh-cart-summary">
               <div><span>الإجمالي الفرعي</span><span>{egp(subtotal)} ج.م</span></div>
               {couponDiscount>0 && <div><span>خصم الكوبون</span><span>-{egp(couponDiscount)} ج.م</span></div>}
-              <div><span>الشحن</span><span>{egp(shippingCost)} ج.م</span></div>
+              <div><span>الشحن</span><span>{qualifiesFreeShipping ? "مجاني" : `${egp(effectiveShipping)} ج.م`}</span></div>
               <div className="kh-cart-total"><span>الإجمالي</span><span>{egp(grandTotal)} ج.م</span></div>
             </div>
             <button className="kh-btn kh-btn-primary kh-full" onClick={onCheckout}>إتمام الطلب</button>
@@ -753,14 +829,16 @@ function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,couponInpu
   );
 }
 
-function CheckoutModal({onClose,onSubmit,total,shippingCost,savedPhone,myPoints}){
+function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,savedPhone,myPoints}){
   const [form,setForm] = useState({name:"",phone:savedPhone||"",phone2:"",governorate:"",city:"",area:"",address:"",landmark:"",usePoints:false});
   const [submitting,setSubmitting] = useState(false);
   const canSubmit = form.name.trim() && form.phone.trim() && form.governorate && form.city.trim() && form.address.trim();
   const pointsValue = myPoints?.pointValue || 1;
   const pointsAvailable = myPoints?.points || 0;
   const pointsDiscount = form.usePoints ? Math.min(total, pointsAvailable*pointsValue) : 0;
-  const grandTotal = Math.max(0, total-pointsDiscount) + Number(shippingCost || 0);
+  const qualifiesFreeShipping = Number(freeShippingMin) > 0 && total >= Number(freeShippingMin);
+  const effectiveShipping = qualifiesFreeShipping ? 0 : Number(shippingCost || 0);
+  const grandTotal = Math.max(0, total-pointsDiscount) + effectiveShipping;
 
   async function handleSubmit(){
     setSubmitting(true);
@@ -774,7 +852,7 @@ function CheckoutModal({onClose,onSubmit,total,shippingCost,savedPhone,myPoints}
         <button className="kh-close" onClick={onClose}><X size={18}/></button>
         <h3>بيانات التوصيل</h3>
         <p className="kh-muted">
-          المنتجات: {egp(total)} ج.م + شحن {egp(shippingCost)} ج.م
+          المنتجات: {egp(total)} ج.م + شحن {qualifiesFreeShipping ? "مجاني" : `${egp(effectiveShipping)} ج.م`}
           {pointsDiscount>0 && <> - نقاط {egp(pointsDiscount)} ج.م</>}
           {" "}= <strong>{egp(grandTotal)} ج.م</strong> — الدفع عند الاستلام
         </p>

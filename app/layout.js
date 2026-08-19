@@ -1,8 +1,20 @@
 import "./globals.css";
 
 export const metadata = {
+  metadataBase: new URL("https://khizana-next.vercel.app"),
   title: "خِزانة | كل أدوات بيتك في مكان واحد",
-  description: "متجر إلكتروني لأدوات ولوازم المنزل",
+  description: "متجر إلكتروني لأدوات ولوازم المنزل — توصيل لجميع محافظات مصر والدفع عند الاستلام.",
+  openGraph: {
+    title: "خِزانة | كل أدوات بيتك في مكان واحد",
+    description: "متجر إلكتروني لأدوات ولوازم المنزل — توصيل لجميع محافظات مصر والدفع عند الاستلام.",
+    locale: "ar_EG",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "خِزانة | كل أدوات بيتك في مكان واحد",
+    description: "متجر إلكتروني لأدوات ولوازم المنزل.",
+  },
 };
 
 export default function RootLayout({ children }) {

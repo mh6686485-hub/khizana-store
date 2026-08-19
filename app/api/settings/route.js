@@ -14,6 +14,7 @@ export async function GET(req) {
       shipping_cost: s.shipping_cost,
       points_per_egp: s.points_per_egp,
       point_value: s.point_value,
+      free_shipping_min: s.free_shipping_min,
     });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -26,10 +27,10 @@ export async function PUT(req) {
     const b = await req.json();
     const p = await db();
     const { rows } = await p.query(
-      `UPDATE settings SET store_name=$1, whatsapp=$2, admin_password=$3, shipping_cost=$4, points_per_egp=$5, point_value=$6 WHERE id=1 RETURNING *`,
+      `UPDATE settings SET store_name=$1, whatsapp=$2, admin_password=$3, shipping_cost=$4, points_per_egp=$5, point_value=$6, free_shipping_min=$7 WHERE id=1 RETURNING *`,
       [
         b.storeName, b.whatsapp, b.adminPassword, Number(b.shippingCost) || 0,
-        Number(b.pointsPerEgp) || 0, Number(b.pointValue) || 1,
+        Number(b.pointsPerEgp) || 0, Number(b.pointValue) || 1, Number(b.freeShippingMin) || 0,
       ]
     );
     return NextResponse.json(rows[0]);
