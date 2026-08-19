@@ -1,14 +1,14 @@
 :root{
   /* ============ Brand tokens (edit these 6 to re-theme the whole site) ============ */
-  --cream:#F7F4EC;        /* main background */
-  --cream-deep:#E8DFD0;   /* soft beige surfaces */
-  --white:#FFFDF8;
-  --ink:#2E2E27;          /* dark text */
-  --ink-soft:#6E6D5F;     /* muted text */
-  --olive:#586B45;        /* primary brand color */
-  --olive-deep:#354331;   /* dark olive */
-  --terracotta:#C96A45;   /* accent: discounts / urgency / CTA */
-  --terracotta-deep:#A8532E;
+  --cream:#F5FAFA;        /* main background */
+  --cream-deep:#EAF4F4;   /* soft surfaces */
+  --white:#FFFFFF;
+  --ink:#1D2424;          /* dark text */
+  --ink-soft:#5F6E6E;     /* muted text */
+  --olive:#08A6A6;        /* primary brand color — turquoise */
+  --olive-deep:#087C80;   /* dark turquoise — text/buttons */
+  --terracotta:#08A6A6;   /* accent (same family — no second accent specified) */
+  --terracotta-deep:#087C80;
 
   /* ============ Aliases (kept so every component below stays untouched) ============ */
   --linen:var(--cream);
