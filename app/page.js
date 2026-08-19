@@ -275,6 +275,10 @@ export default function StorePage(){
     try{
       const res = await fetch("/api/orders", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
       const order = await res.json();
+      if(!res.ok){
+        showToast(order.error || "تعذر إتمام الطلب");
+        return;
+      }
       setCart([]); setAppliedCoupon(null); setCouponInput(""); setCheckoutOpen(false); setCartOpen(false);
       setSuccessOrder(order);
       if(phone) fetch(`/api/points?phone=${encodeURIComponent(phone)}`).then(r=>r.json()).then(d=>setMyPoints(d)).catch(()=>{});
@@ -501,8 +505,9 @@ export default function StorePage(){
         <div className="kh-wrap kh-footer-inner">
           <span>© 2026 {settings.store_name}. جميع الحقوق محفوظة.</span>
           <div style={{display:"flex", gap:18}}>
+            <Link href="/about" className="kh-admin-link">من نحن</Link>
+            <Link href="/returns" className="kh-admin-link">سياسة الاستبدال</Link>
             <Link href="/track" className="kh-admin-link">تتبع طلبك</Link>
-            <Link href="/admin" className="kh-admin-link"><Lock size={13}/> لوحة التحكم</Link>
           </div>
         </div>
       </footer>
@@ -526,7 +531,7 @@ export default function StorePage(){
       {checkoutOpen && (
         <CheckoutModal onClose={()=>setCheckoutOpen(false)} onSubmit={submitOrder}
           total={total} shippingCost={settings.shipping_cost} freeShippingMin={settings.free_shipping_min}
-          savedPhone={phone} myPoints={myPoints} />
+          minOrderAmount={settings.min_order_amount} savedPhone={phone} myPoints={myPoints} />
       )}
 
       {successOrder && (
@@ -829,10 +834,11 @@ function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,freeShippi
   );
 }
 
-function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,savedPhone,myPoints}){
+function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,minOrderAmount,savedPhone,myPoints}){
   const [form,setForm] = useState({name:"",phone:savedPhone||"",phone2:"",governorate:"",city:"",area:"",address:"",landmark:"",usePoints:false});
   const [submitting,setSubmitting] = useState(false);
-  const canSubmit = form.name.trim() && form.phone.trim() && form.governorate && form.city.trim() && form.address.trim();
+  const meetsMinOrder = !Number(minOrderAmount) || total >= Number(minOrderAmount);
+  const canSubmit = meetsMinOrder && form.name.trim() && form.phone.trim() && form.governorate && form.city.trim() && form.address.trim();
   const pointsValue = myPoints?.pointValue || 1;
   const pointsAvailable = myPoints?.points || 0;
   const pointsDiscount = form.usePoints ? Math.min(total, pointsAvailable*pointsValue) : 0;
@@ -851,6 +857,11 @@ function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,save
       <div className="kh-modal" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
         <button className="kh-close" onClick={onClose}><X size={18}/></button>
         <h3>بيانات التوصيل</h3>
+        {!meetsMinOrder && (
+          <div className="kh-coupon-msg" style={{marginBottom:10}}>
+            الحد الأدنى لقيمة الطلب {egp(minOrderAmount)} ج.م — ضيف منتجات أكتر عشان تقدر تكمل الطلب.
+          </div>
+        )}
         <p className="kh-muted">
           المنتجات: {egp(total)} ج.م + شحن {qualifiesFreeShipping ? "مجاني" : `${egp(effectiveShipping)} ج.م`}
           {pointsDiscount>0 && <> - نقاط {egp(pointsDiscount)} ج.م</>}

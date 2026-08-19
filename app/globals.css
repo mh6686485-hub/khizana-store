@@ -239,6 +239,31 @@ img{max-width:100%;display:block;}
 .kh-free-shipping-note{display:flex;align-items:center;gap:7px;background:var(--cream-deep);color:var(--olive-deep);font-size:.8rem;font-weight:600;padding:9px 12px;border-radius:10px;margin-bottom:12px;}
 .kh-free-shipping-note.ok{background:var(--olive);color:#fff;}
 
+/* ============ Printable invoice ============ */
+.kh-invoice-page{background:#e9e9e9;min-height:100vh;padding:30px 16px;}
+.kh-invoice-actions{max-width:720px;margin:0 auto 16px;display:flex;justify-content:flex-end;}
+.kh-invoice-sheet{max-width:720px;margin:0 auto;background:#fff;padding:40px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.08);}
+.kh-invoice-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--olive);padding-bottom:16px;margin-bottom:16px;}
+.kh-invoice-header h1{font-size:1.5rem;color:var(--olive-deep);}
+.kh-invoice-header p{color:var(--ink-soft);font-size:.85rem;margin-top:2px;}
+.kh-invoice-meta{font-size:.85rem;text-align:left;display:flex;flex-direction:column;gap:4px;}
+.kh-invoice-customer{background:var(--cream-deep);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:.88rem;display:flex;flex-direction:column;gap:6px;}
+.kh-invoice-table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:.88rem;}
+.kh-invoice-table th{text-align:right;padding:10px;background:var(--cream-deep);border-bottom:1px solid #ddd;}
+.kh-invoice-table td{padding:10px;border-bottom:1px solid #eee;}
+.kh-invoice-totals{max-width:280px;margin-right:auto;font-size:.88rem;}
+.kh-invoice-totals > div{display:flex;justify-content:space-between;padding:4px 0;}
+.kh-invoice-grand{font-weight:700;font-size:1.05rem;color:var(--olive-deep);border-top:1px solid #ddd;margin-top:6px;padding-top:8px !important;}
+.kh-invoice-footer{margin-top:30px;text-align:center;color:var(--ink-soft);font-size:.85rem;border-top:1px dashed #ddd;padding-top:16px;}
+@media print{
+  .no-print{display:none !important;}
+  .kh-invoice-page{background:#fff;padding:0;}
+  .kh-invoice-sheet{box-shadow:none;max-width:100%;}
+}
+
+/* ============ Static content pages (about/returns) ============ */
+.kh-content-page{white-space:pre-line;line-height:1.9;color:var(--ink);}
+
 
 /* ============ Floating cart button ============ */
 .kh-fab-cart{position:fixed;bottom:22px;left:22px;z-index:70;width:56px;height:56px;border-radius:50%;background:var(--olive);color:#fff;border:none;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 30px rgba(53,67,49,.4);}

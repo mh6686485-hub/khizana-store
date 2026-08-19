@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, LogOut, Package, LayoutGrid, Ticket, Tag, Settings as SettingsIcon, X, Upload, ImageOff, LayoutDashboard, Star, Bell, ShoppingBag, DollarSign, Users, Gift, MessageCircle, Package2 } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Plus, Pencil, Trash2, LogOut, Package, LayoutGrid, Ticket, Tag, Settings as SettingsIcon, X, Upload, ImageOff, LayoutDashboard, Star, Bell, ShoppingBag, DollarSign, Users, Gift, MessageCircle, Package2, Printer, Download, FileText } from "lucide-react";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
 function fileToBase64(file){
@@ -34,7 +34,7 @@ export default function AdminPage(){
   const [report,setReport] = useState(null);
   const [bundles,setBundles] = useState([]);
   const [customers,setCustomers] = useState([]);
-  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60,points_per_egp:0.1,point_value:1,free_shipping_min:0});
+  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60,points_per_egp:0.1,point_value:1,free_shipping_min:0,min_order_amount:0,about_us:"",return_policy:""});
 
   const [showForm,setShowForm] = useState(false);
   const [editing,setEditing] = useState(null);
@@ -56,6 +56,57 @@ export default function AdminPage(){
       setChecking(false);
     })();
   },[]);
+
+  const lastNewOrdersRef = useRef(null);
+  useEffect(()=>{
+    if(!authed) return;
+    if(typeof Notification !== "undefined" && Notification.permission === "default"){
+      Notification.requestPermission().catch(()=>{});
+    }
+    const interval = setInterval(async ()=>{
+      try{
+        const res = await fetch("/api/orders/new-count");
+        const data = await res.json();
+        const count = data.count || 0;
+        if(lastNewOrdersRef.current !== null && count > lastNewOrdersRef.current){
+          playNewOrderSound();
+          showToast("🔔 وصل طلب جديد!");
+          if(typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden){
+            new Notification("طلب جديد في خِزانة", { body: "افتح لوحة التحكم لمراجعته" });
+          }
+          loadAll();
+        }
+        lastNewOrdersRef.current = count;
+      }catch(e){}
+    }, 20000);
+    return ()=>clearInterval(interval);
+  },[authed]);
+
+  function playNewOrderSound(){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      [880,1080].forEach((freq,i)=>{
+        const osc = ctx.createOscillator();
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        osc.start(ctx.currentTime + i*0.18);
+        osc.stop(ctx.currentTime + i*0.18 + 0.16);
+      });
+    }catch(e){}
+  }
+
+  function downloadBackup(){
+    const backup = { exportedAt: new Date().toISOString(), products, categories, coupons, orders, reviews, bundles, settings };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `نسخة-احتياطية-خزانة-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   async function loadAll(){
     const [p,c,cp,o,s,rv,rp,bd,cu] = await Promise.all([
@@ -192,6 +243,7 @@ export default function AdminPage(){
         storeName:settings.store_name, whatsapp:settings.whatsapp,
         adminPassword:settings.admin_password, shippingCost:settings.shipping_cost,
         pointsPerEgp:settings.points_per_egp, pointValue:settings.point_value, freeShippingMin:settings.free_shipping_min,
+        minOrderAmount:settings.min_order_amount, aboutUs:settings.about_us, returnPolicy:settings.return_policy,
       }),
     });
     showToast("تم حفظ الإعدادات");
@@ -259,6 +311,7 @@ export default function AdminPage(){
     {id:"orders",label:"الطلبات",icon:Tag},
     {id:"reviews",label:"التقييمات",icon:Star},
     {id:"customers",label:"متابعة العملاء",icon:Users},
+    {id:"pages",label:"صفحات الموقع",icon:FileText},
     {id:"settings",label:"الإعدادات",icon:SettingsIcon},
   ];
   const newOrdersCount = orders.filter(o=>o.status==="جديد").length;
@@ -506,6 +559,11 @@ export default function AdminPage(){
                         >
                           {ORDER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
                         </select>
+                        <a href={`/boss/invoice/${o.id}`} target="_blank" rel="noopener"
+                          style={{background:"var(--cream-deep)", width:30, height:30, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center"}}
+                          aria-label="طباعة الفاتورة">
+                          <Printer size={15}/>
+                        </a>
                       </div>
                       <div className="kh-order-customer">
                         {o.customer?.name} — {o.customer?.phone}{o.phone2 ? ` / ${o.phone2}` : ""}
@@ -582,12 +640,22 @@ export default function AdminPage(){
             )
           )}
 
+          {tab==="pages" && (
+            <div className="kh-form" style={{maxWidth:560}}>
+              <p className="kh-muted">النصوص دي بتظهر للعملاء في صفحتي "من نحن" و"سياسة الاستبدال" أسفل الموقع.</p>
+              <label>نبذة عن المتجر (من نحن)<textarea rows={6} value={settings.about_us||""} onChange={e=>setSettings({...settings,about_us:e.target.value})} placeholder="اكتب هنا نبذة عن متجرك، رسالتك، وليه العميل يختارك..."/></label>
+              <label>سياسة الاستبدال والإرجاع<textarea rows={6} value={settings.return_policy||""} onChange={e=>setSettings({...settings,return_policy:e.target.value})} placeholder="اكتب هنا شروط الاستبدال، المدة المسموحة، حالة المنتج المطلوبة..."/></label>
+              <button className="kh-btn kh-btn-primary" onClick={saveSettings}>حفظ الصفحات</button>
+            </div>
+          )}
+
           {tab==="settings" && (
             <div className="kh-form" style={{maxWidth:420}}>
               <label>اسم المتجر<input value={settings.store_name||""} onChange={e=>setSettings({...settings,store_name:e.target.value})}/></label>
               <label>رقم واتساب (بالصيغة الدولية بدون +)<input value={settings.whatsapp||""} onChange={e=>setSettings({...settings,whatsapp:e.target.value})} placeholder="201000000000"/></label>
               <label>تكلفة الشحن (ج.م)<input type="number" value={settings.shipping_cost ?? 60} onChange={e=>setSettings({...settings,shipping_cost:e.target.value})}/></label>
               <label>شحن مجاني فوق (ج.م) — اتركها صفر لإلغاء الميزة<input type="number" value={settings.free_shipping_min ?? 0} onChange={e=>setSettings({...settings,free_shipping_min:e.target.value})}/></label>
+              <label>الحد الأدنى لقيمة الطلب (ج.م) — اتركها صفر لإلغاء الميزة<input type="number" value={settings.min_order_amount ?? 0} onChange={e=>setSettings({...settings,min_order_amount:e.target.value})}/></label>
               <label>كلمة مرور لوحة التحكم<input value={settings.admin_password||""} onChange={e=>setSettings({...settings,admin_password:e.target.value})}/></label>
               <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
                 <strong style={{fontSize:".9rem"}}>نقاط الولاء</strong>
@@ -595,6 +663,11 @@ export default function AdminPage(){
               <label>نقطة لكل كام جنيه؟<input type="number" value={settings.points_per_egp ? Math.round(1/settings.points_per_egp) : 10} onChange={e=>setSettings({...settings,points_per_egp: 1/(Number(e.target.value)||10)})} placeholder="10"/></label>
               <label>قيمة النقطة الواحدة عند الاستخدام (ج.م)<input type="number" value={settings.point_value ?? 1} onChange={e=>setSettings({...settings,point_value:e.target.value})}/></label>
               <button className="kh-btn kh-btn-primary" onClick={saveSettings}>حفظ الإعدادات</button>
+              <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
+                <strong style={{fontSize:".9rem"}}>نسخة احتياطية</strong>
+                <p className="kh-muted" style={{marginTop:6, marginBottom:10}}>تنزيل كل بيانات المتجر (منتجات، طلبات، عملاء...) كملف واحد.</p>
+                <button className="kh-btn kh-btn-ghost" onClick={downloadBackup}><Download size={15}/> تنزيل نسخة احتياطية الآن</button>
+              </div>
             </div>
           )}
         </main>
