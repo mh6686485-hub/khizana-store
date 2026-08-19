@@ -16,6 +16,7 @@ export default function AccountPage(){
   const [tab,setTab] = useState(params?.get("tab") === "wishlist" ? "wishlist" : "orders");
   const [orders,setOrders] = useState([]);
   const [wishlistProducts,setWishlistProducts] = useState([]);
+  const [points,setPoints] = useState(null);
   const [loading,setLoading] = useState(false);
 
   useEffect(()=>{
@@ -30,10 +31,12 @@ export default function AccountPage(){
       fetch("/api/customer/orders", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({phone}) }).then(r=>r.json()),
       fetch(`/api/wishlist?phone=${encodeURIComponent(phone)}`).then(r=>r.json()),
       fetch("/api/products").then(r=>r.json()),
-    ]).then(([ordersData, wishlistIds, allProducts])=>{
+      fetch(`/api/points?phone=${encodeURIComponent(phone)}`).then(r=>r.json()),
+    ]).then(([ordersData, wishlistIds, allProducts, pointsData])=>{
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
       setWishlistProducts((allProducts||[]).filter(p=>ids.includes(p.id)));
+      setPoints(pointsData);
     }).catch(()=>{}).finally(()=>setLoading(false));
   },[phone]);
 
@@ -83,6 +86,7 @@ export default function AccountPage(){
               <div>
                 <h2 style={{fontSize:"1.3rem"}}>حسابي</h2>
                 <p className="kh-muted">{phone}</p>
+                {points?.points>0 && <p style={{color:"var(--olive-deep)", fontWeight:700, fontSize:".85rem", marginTop:4}}>⭐ {points.points} نقطة ولاء (تساوي {egp(points.points*(points.pointValue||1))} ج.م)</p>}
               </div>
               <button className="kh-btn kh-btn-ghost" onClick={logout}><LogOut size={15}/> خروج</button>
             </div>

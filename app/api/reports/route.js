@@ -29,6 +29,26 @@ export async function GET(req) {
       .slice(0, 5)
       .map(([name, qty]) => ({ name, qty }));
 
+    // Last 7 days revenue trend for the dashboard mini-chart.
+    const dailyMap = {};
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      days.push(key);
+      dailyMap[key] = 0;
+    }
+    for (const o of validOrders) {
+      const key = new Date(o.created_at).toISOString().slice(0, 10);
+      if (key in dailyMap) dailyMap[key] += Number(o.total || 0);
+    }
+    const dailyRevenue = days.map((key) => ({
+      date: key,
+      label: new Date(key).toLocaleDateString("ar-EG", { weekday: "short" }),
+      total: dailyMap[key],
+    }));
+
     return NextResponse.json({
       totalOrders: orderRows.length,
       newOrders: orderRows.filter((o) => o.status === "جديد").length,
@@ -38,6 +58,7 @@ export async function GET(req) {
       pendingReviews: pendingReviewRows[0].c,
       recentOrders: orderRows.slice(0, 6),
       topProducts,
+      dailyRevenue,
     });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

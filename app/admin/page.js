@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, LogOut, Package, LayoutGrid, Ticket, Tag, Settings as SettingsIcon, X, Upload, ImageOff, LayoutDashboard, Star, Bell, ShoppingBag, DollarSign, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, LogOut, Package, LayoutGrid, Ticket, Tag, Settings as SettingsIcon, X, Upload, ImageOff, LayoutDashboard, Star, Bell, ShoppingBag, DollarSign, Users, Gift, MessageCircle, Package2 } from "lucide-react";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
 function fileToBase64(file){
@@ -32,12 +32,16 @@ export default function AdminPage(){
   const [orders,setOrders] = useState([]);
   const [reviews,setReviews] = useState([]);
   const [report,setReport] = useState(null);
-  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60});
+  const [bundles,setBundles] = useState([]);
+  const [customers,setCustomers] = useState([]);
+  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60,points_per_egp:0.1,point_value:1});
 
   const [showForm,setShowForm] = useState(false);
   const [editing,setEditing] = useState(null);
   const [newCategoryName,setNewCategoryName] = useState("");
   const [couponForm,setCouponForm] = useState({code:"",discountPercent:10,minOrder:0,expiry:"",active:true,discountType:"percent",maxUses:""});
+  const [showBundleForm,setShowBundleForm] = useState(false);
+  const [bundleForm,setBundleForm] = useState({id:null,name:"",description:"",image:"",price:"",active:true,items:[]});
 
   function showToast(msg){ setToast(msg); setTimeout(()=>setToast(""),2600); }
 
@@ -54,7 +58,7 @@ export default function AdminPage(){
   },[]);
 
   async function loadAll(){
-    const [p,c,cp,o,s,rv,rp] = await Promise.all([
+    const [p,c,cp,o,s,rv,rp,bd,cu] = await Promise.all([
       fetch("/api/products").then(r=>r.json()),
       fetch("/api/categories").then(r=>r.json()),
       fetch("/api/coupons").then(r=>r.json()),
@@ -62,10 +66,14 @@ export default function AdminPage(){
       fetch("/api/settings").then(r=>r.json()),
       fetch("/api/reviews").then(r=>r.json()),
       fetch("/api/reports").then(r=>r.json()),
+      fetch("/api/bundles").then(r=>r.json()),
+      fetch("/api/customers").then(r=>r.json()),
     ]);
     setProducts(p); setCategories(c); setCoupons(cp); setOrders(o); setSettings(s);
     setReviews(Array.isArray(rv) ? rv : []);
     setReport(rp);
+    setBundles(Array.isArray(bd) ? bd : []);
+    setCustomers(Array.isArray(cu) ? cu : []);
   }
 
   async function login(e){
@@ -145,9 +153,46 @@ export default function AdminPage(){
       body:JSON.stringify({
         storeName:settings.store_name, whatsapp:settings.whatsapp,
         adminPassword:settings.admin_password, shippingCost:settings.shipping_cost,
+        pointsPerEgp:settings.points_per_egp, pointValue:settings.point_value,
       }),
     });
     showToast("تم حفظ الإعدادات");
+  }
+
+  function openNewBundle(){
+    setBundleForm({id:null,name:"",description:"",image:"",price:"",active:true,items:[]});
+    setShowBundleForm(true);
+  }
+  function openEditBundle(b){
+    setBundleForm({
+      id:b.id, name:b.name, description:b.description||"", image:b.image||"",
+      price:b.price, active:b.active,
+      items:(b.items||[]).map(it=>({productId:it.product_id, qty:it.qty})),
+    });
+    setShowBundleForm(true);
+  }
+  async function saveBundle(){
+    if(!bundleForm.name.trim() || bundleForm.items.length===0){ showToast("أدخل اسم الباقة واختر منتج واحد على الأقل"); return; }
+    const method = bundleForm.id ? "PUT" : "POST";
+    const url = bundleForm.id ? `/api/bundles/${bundleForm.id}` : "/api/bundles";
+    await fetch(url, { method, headers:{"Content-Type":"application/json"}, body:JSON.stringify(bundleForm) });
+    setShowBundleForm(false);
+    await loadAll();
+    showToast("تم حفظ الباقة");
+  }
+  async function deleteBundle(id){
+    await fetch(`/api/bundles/${id}`, { method:"DELETE" });
+    await loadAll();
+  }
+  function toggleBundleItem(productId){
+    setBundleForm(prev=>{
+      const exists = prev.items.find(it=>it.productId===productId);
+      if(exists) return {...prev, items:prev.items.filter(it=>it.productId!==productId)};
+      return {...prev, items:[...prev.items, {productId, qty:1}]};
+    });
+  }
+  function setBundleItemQty(productId, qty){
+    setBundleForm(prev=>({...prev, items:prev.items.map(it=>it.productId===productId?{...it,qty:Math.max(1,Number(qty)||1)}:it)}));
   }
 
   if(checking) return <div className="kh-root kh-loading">جارِ التحقق...</div>;
@@ -170,10 +215,12 @@ export default function AdminPage(){
   const tabs = [
     {id:"dashboard",label:"لوحة المعلومات",icon:LayoutDashboard},
     {id:"products",label:"المنتجات",icon:Package},
+    {id:"bundles",label:"الباقات",icon:Gift},
     {id:"categories",label:"الأقسام",icon:LayoutGrid},
     {id:"coupons",label:"الكوبونات",icon:Ticket},
     {id:"orders",label:"الطلبات",icon:Tag},
     {id:"reviews",label:"التقييمات",icon:Star},
+    {id:"customers",label:"متابعة العملاء",icon:Users},
     {id:"settings",label:"الإعدادات",icon:SettingsIcon},
   ];
   const newOrdersCount = orders.filter(o=>o.status==="جديد").length;
@@ -225,6 +272,22 @@ export default function AdminPage(){
                     <div className="kh-stat-card">
                       <Users size={18} color="var(--olive)"/>
                       <div><strong>{report.totalCustomers}</strong><span>العملاء</span></div>
+                    </div>
+                  </div>
+
+                  <div style={{marginTop:24}}>
+                    <h3 style={{fontSize:"1rem", marginBottom:4}}>المبيعات آخر 7 أيام</h3>
+                    <div className="kh-bar-chart">
+                      {report.dailyRevenue?.map(d=>{
+                        const max = Math.max(...report.dailyRevenue.map(x=>x.total), 1);
+                        return (
+                          <div key={d.date} className="kh-bar-chart-col">
+                            <span style={{fontSize:".68rem", color:"var(--ink-soft)"}}>{d.total>0 ? egp(d.total) : ""}</span>
+                            <div className="kh-bar-chart-bar" style={{height:`${Math.max(4,(d.total/max)*90)}px`}}/>
+                            <span className="kh-bar-chart-label">{d.label}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -291,6 +354,33 @@ export default function AdminPage(){
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {tab==="bundles" && (
+            <div>
+              <button className="kh-btn kh-btn-primary" onClick={openNewBundle} style={{marginBottom:18}}><Plus size={15}/> إضافة باقة</button>
+              {bundles.length===0 ? <div className="kh-empty">لسه معملتش أي باقات.</div> : (
+                <div className="kh-table-wrap">
+                  <table className="kh-table">
+                    <thead><tr><th>الاسم</th><th>المنتجات</th><th>السعر</th><th>الحالة</th><th></th></tr></thead>
+                    <tbody>
+                      {bundles.map(b=>(
+                        <tr key={b.id}>
+                          <td>{b.name}</td>
+                          <td>{(b.items||[]).map(it=>it.name).join("، ")}</td>
+                          <td>{egp(b.price)} ج.م</td>
+                          <td><span className={"kh-status"+(b.active?" ok":"")}>{b.active?"مفعّلة":"متوقفة"}</span></td>
+                          <td className="kh-table-actions">
+                            <button onClick={()=>openEditBundle(b)}><Pencil size={15}/></button>
+                            <button onClick={()=>deleteBundle(b.id)}><Trash2 size={15}/></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -403,17 +493,60 @@ export default function AdminPage(){
             )
           )}
 
+          {tab==="customers" && (
+            customers.length===0 ? <div className="kh-empty">لسه مفيش عملاء.</div> : (
+              <div>
+                <p className="kh-muted" style={{marginBottom:16}}>مرتّبين من الأقدم طلبًا — دول أنسب عملاء تتواصل معاهم دلوقتي.</p>
+                <div className="kh-table-wrap">
+                  <table className="kh-table">
+                    <thead><tr><th>العميل</th><th>الهاتف</th><th>عدد الطلبات</th><th>إجمالي الإنفاق</th><th>آخر طلب</th><th></th></tr></thead>
+                    <tbody>
+                      {customers.map(c=>{
+                        const days = Math.floor((Date.now()-new Date(c.last_order_at).getTime())/86400000);
+                        return (
+                          <tr key={c.phone}>
+                            <td>{c.name}</td>
+                            <td>{c.phone}</td>
+                            <td>{c.order_count}</td>
+                            <td>{egp(c.total_spent)} ج.م</td>
+                            <td>{days===0?"النهاردة":`من ${days} يوم`}</td>
+                            <td className="kh-table-actions">
+                              <a href={`https://wa.me/2${c.phone}`} target="_blank" rel="noopener" style={{background:"var(--cream-deep)", width:30, height:30, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center"}}>
+                                <MessageCircle size={15}/>
+                              </a>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          )}
+
           {tab==="settings" && (
             <div className="kh-form" style={{maxWidth:420}}>
               <label>اسم المتجر<input value={settings.store_name||""} onChange={e=>setSettings({...settings,store_name:e.target.value})}/></label>
               <label>رقم واتساب (بالصيغة الدولية بدون +)<input value={settings.whatsapp||""} onChange={e=>setSettings({...settings,whatsapp:e.target.value})} placeholder="201000000000"/></label>
               <label>تكلفة الشحن (ج.م)<input type="number" value={settings.shipping_cost ?? 60} onChange={e=>setSettings({...settings,shipping_cost:e.target.value})}/></label>
               <label>كلمة مرور لوحة التحكم<input value={settings.admin_password||""} onChange={e=>setSettings({...settings,admin_password:e.target.value})}/></label>
+              <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
+                <strong style={{fontSize:".9rem"}}>نقاط الولاء</strong>
+              </div>
+              <label>نقطة لكل كام جنيه؟<input type="number" value={settings.points_per_egp ? Math.round(1/settings.points_per_egp) : 10} onChange={e=>setSettings({...settings,points_per_egp: 1/(Number(e.target.value)||10)})} placeholder="10"/></label>
+              <label>قيمة النقطة الواحدة عند الاستخدام (ج.م)<input type="number" value={settings.point_value ?? 1} onChange={e=>setSettings({...settings,point_value:e.target.value})}/></label>
               <button className="kh-btn kh-btn-primary" onClick={saveSettings}>حفظ الإعدادات</button>
             </div>
           )}
         </main>
       </div>
+
+      {showBundleForm && (
+        <BundleFormModal bundle={bundleForm} setBundle={setBundleForm} products={products}
+          onCancel={()=>setShowBundleForm(false)} onSave={saveBundle}
+          toggleItem={toggleBundleItem} setItemQty={setBundleItemQty}/>
+      )}
 
       {showForm && editing && (
         <ProductFormModal product={editing} setProduct={setEditing} categories={categories}
@@ -475,6 +608,72 @@ function ProductFormModal({product,setProduct,categories,onCancel,onSave}){
           </div>
         </div>
         <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:16}} onClick={onSave}>💾 حفظ المنتج</button>
+      </div>
+    </div>
+  );
+}
+
+function BundleFormModal({bundle,setBundle,products,onCancel,onSave,toggleItem,setItemQty}){
+  const [imgMode,setImgMode] = useState(bundle.image && bundle.image.startsWith("data:") ? "upload" : "url");
+  async function handleFile(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const b64 = await fileToBase64(file);
+    setBundle({...bundle, image:b64});
+  }
+  const compTotal = bundle.items.reduce((s,it)=>{
+    const p = products.find(pp=>pp.id===it.productId);
+    return s + (p ? Number(p.price)*it.qty : 0);
+  },0);
+  return (
+    <div className="kh-overlay" onClick={onCancel}>
+      <div className="kh-modal kh-product-form" onClick={e=>e.stopPropagation()}>
+        <button className="kh-close" onClick={onCancel}><X size={18}/></button>
+        <h3>{bundle.id ? "تعديل باقة" : "إضافة باقة"}</h3>
+        <div className="kh-form">
+          <label>اسم الباقة<input value={bundle.name} onChange={e=>setBundle({...bundle,name:e.target.value})}/></label>
+          <label>وصف الباقة (اختياري)<textarea rows={2} value={bundle.description} onChange={e=>setBundle({...bundle,description:e.target.value})}/></label>
+
+          <div>
+            <div className="kh-img-toggle">
+              <button type="button" className={imgMode==="url"?"active":""} onClick={()=>setImgMode("url")}>رابط صورة</button>
+              <button type="button" className={imgMode==="upload"?"active":""} onClick={()=>setImgMode("upload")}>رفع صورة</button>
+            </div>
+            {imgMode==="url" ? (
+              <input placeholder="https://... (اختياري، هيستخدم صورة أول منتج لو فاضي)" value={bundle.image && bundle.image.startsWith("data:") ? "" : bundle.image} onChange={e=>setBundle({...bundle,image:e.target.value})}/>
+            ) : (
+              <label className="kh-upload"><Upload size={16}/> اختر صورة<input type="file" accept="image/*" onChange={handleFile} hidden/></label>
+            )}
+            {bundle.image && <img src={bundle.image} alt="معاينة" className="kh-img-preview"/>}
+          </div>
+
+          <label>سعر الباقة (ج.م)<input type="number" value={bundle.price} onChange={e=>setBundle({...bundle,price:e.target.value})}/></label>
+          {compTotal>0 && <p className="kh-muted">مجموع أسعار المنتجات منفردة: {egp(compTotal)} ج.م</p>}
+
+          <label><input type="checkbox" checked={bundle.active} onChange={e=>setBundle({...bundle,active:e.target.checked})} style={{width:"auto"}}/> الباقة مفعّلة</label>
+
+          <div>
+            <strong style={{fontSize:".85rem", color:"var(--ink-soft)"}}>اختر منتجات الباقة</strong>
+            <div className="kh-cat-list" style={{marginTop:8, maxHeight:220, overflow:"auto"}}>
+              {products.map(p=>{
+                const item = bundle.items.find(it=>it.productId===p.id);
+                return (
+                  <div key={p.id} className="kh-cat-item">
+                    <label style={{display:"flex", alignItems:"center", gap:8, flex:1, cursor:"pointer"}}>
+                      <input type="checkbox" checked={!!item} onChange={()=>toggleItem(p.id)} style={{width:"auto"}}/>
+                      {p.name} <span className="kh-muted">({egp(p.price)} ج.م)</span>
+                    </label>
+                    {item && (
+                      <input type="number" min="1" value={item.qty} onChange={e=>setItemQty(p.id, e.target.value)}
+                        style={{width:60, padding:"4px 6px", borderRadius:6, border:"1px solid rgba(53,67,49,.2)"}}/>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:16}} onClick={onSave}>💾 حفظ الباقة</button>
       </div>
     </div>
   );

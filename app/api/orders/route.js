@@ -20,16 +20,36 @@ export async function POST(req) {
     const b = await req.json();
     const p = await db();
 
-    const { rows: sRows } = await p.query("SELECT shipping_cost FROM settings WHERE id=1");
+    const { rows: sRows } = await p.query(
+      "SELECT shipping_cost, points_per_egp, point_value FROM settings WHERE id=1"
+    );
     const shippingCost = Number(sRows[0]?.shipping_cost ?? 60);
-    const finalTotal = Number(b.total || 0) + shippingCost;
+    const pointsPerEgp = Number(sRows[0]?.points_per_egp ?? 0.1);
+    const pointValue = Number(sRows[0]?.point_value ?? 1);
+
+    // Loyalty points redemption (optional, capped at the customer's balance and the order value).
+    let pointsUsed = 0;
+    let pointsDiscount = 0;
+    const phone = b.customer?.phone;
+    if (b.usePoints && phone) {
+      const { rows: cpRows } = await p.query("SELECT points FROM customer_points WHERE phone=$1", [phone]);
+      const available = cpRows[0]?.points || 0;
+      const subtotalAfterCoupon = Math.max(0, Number(b.total || 0));
+      const maxRedeemableValue = Math.min(subtotalAfterCoupon, available * pointValue);
+      pointsUsed = Math.floor(maxRedeemableValue / pointValue);
+      pointsDiscount = pointsUsed * pointValue;
+    }
+
+    const finalTotal = Math.max(0, Number(b.total || 0) - pointsDiscount) + shippingCost;
+    const pointsEarned = Math.floor(finalTotal * pointsPerEgp);
 
     const id = "ORD-" + Date.now().toString(36).toUpperCase();
     const { rows } = await p.query(
       `INSERT INTO orders
          (id, items, subtotal, discount, coupon_code, total, customer, status,
-          governorate, city, area, landmark, phone2, shipping_cost, payment_method)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'جديد',$8,$9,$10,$11,$12,$13,'cod')
+          governorate, city, area, landmark, phone2, shipping_cost, payment_method,
+          points_earned, points_used)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'جديد',$8,$9,$10,$11,$12,$13,'cod',$14,$15)
        RETURNING *, ('KH-' || (order_no + 10000)) AS order_number`,
       [
         id,
@@ -45,12 +65,25 @@ export async function POST(req) {
         b.landmark || "",
         b.phone2 || "",
         shippingCost,
+        pointsEarned,
+        pointsUsed,
       ]
     );
 
-    // Deduct stock for each item (never goes below zero).
+    // Deduct stock: for product lines directly, for bundle lines across each component.
     for (const item of b.items || []) {
-      if (item.productId) {
+      if (item.type === "bundle" && item.bundleId) {
+        const { rows: comp } = await p.query(
+          "SELECT product_id, qty FROM bundle_items WHERE bundle_id=$1",
+          [item.bundleId]
+        );
+        for (const c of comp) {
+          await p.query(
+            "UPDATE products SET stock = GREATEST(stock - $1, 0) WHERE id = $2",
+            [Number(c.qty) * (Number(item.qty) || 1), c.product_id]
+          );
+        }
+      } else if (item.productId) {
         await p.query(
           "UPDATE products SET stock = GREATEST(stock - $1, 0) WHERE id = $2",
           [Number(item.qty) || 1, item.productId]
@@ -58,11 +91,17 @@ export async function POST(req) {
       }
     }
 
-    // Track coupon usage.
+    // Coupon usage tracking.
     if (b.couponCode) {
+      await p.query("UPDATE coupons SET used_count = used_count + 1 WHERE code = $1", [b.couponCode]);
+    }
+
+    // Loyalty points: deduct used, add earned.
+    if (phone) {
       await p.query(
-        "UPDATE coupons SET used_count = used_count + 1 WHERE code = $1",
-        [b.couponCode]
+        `INSERT INTO customer_points (phone, points) VALUES ($1, $2)
+         ON CONFLICT (phone) DO UPDATE SET points = customer_points.points + $2`,
+        [phone, pointsEarned - pointsUsed]
       );
     }
 

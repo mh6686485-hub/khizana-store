@@ -240,6 +240,19 @@ img{max-width:100%;display:block;}
 .kh-nav-badge{margin-right:auto;background:var(--terracotta);color:#fff;font-size:.66rem;font-weight:700;padding:2px 7px;border-radius:999px;}
 .kh-admin-bell{display:flex;align-items:center;gap:6px;background:var(--terracotta);color:#fff;border:none;padding:8px 14px;border-radius:999px;font-size:.8rem;font-weight:700;}
 
+/* ============ Filters bar ============ */
+.kh-filters-bar{display:flex;flex-wrap:wrap;gap:16px;background:var(--white);border:1px solid rgba(53,67,49,.08);border-radius:14px;padding:16px 18px;margin-bottom:18px;align-items:flex-end;}
+.kh-filters-bar label{display:flex;flex-direction:column;gap:5px;font-size:.78rem;font-weight:600;color:var(--ink-soft);}
+.kh-filters-bar input, .kh-filters-bar select{padding:8px 10px;border-radius:8px;border:1px solid rgba(53,67,49,.16);font-size:.85rem;background:var(--cream);min-width:110px;}
+.kh-filter-checkbox{display:flex !important;flex-direction:row !important;align-items:center;gap:7px;font-size:.85rem;font-weight:500 !important;color:var(--ink) !important;}
+
+/* ============ Mini bar chart (admin dashboard) ============ */
+.kh-bar-chart{display:flex;align-items:flex-end;gap:8px;height:120px;margin-top:10px;}
+.kh-bar-chart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.kh-bar-chart-bar{width:100%;background:var(--olive);border-radius:6px 6px 0 0;min-height:3px;}
+.kh-bar-chart-label{font-size:.68rem;color:var(--ink-soft);}
+
+
 @media (max-width:900px){
   .kh-hero{grid-template-columns:1fr;padding:36px 0;gap:28px;}
   .kh-hero h1{font-size:1.9rem;}
