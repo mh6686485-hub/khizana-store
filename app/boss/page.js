@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import * as XLSX from "xlsx";
 import { Plus, Pencil, Trash2, LogOut, Package, LayoutGrid, Ticket, Tag, Settings as SettingsIcon, X, Upload, ImageOff, LayoutDashboard, Star, Bell, ShoppingBag, DollarSign, Users, Gift, MessageCircle, Package2, Printer, Download, FileText } from "lucide-react";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
@@ -236,6 +237,50 @@ export default function AdminPage(){
     downloadCsv("طلبات-خزانة.csv", rows);
   }
 
+  const [importing,setImporting] = useState(false);
+  const [importResult,setImportResult] = useState(null);
+  async function handleImportFile(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    setImporting(true);
+    setImportResult(null);
+    try{
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type:"array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval:"" });
+
+      const mapped = rows.map(r=>({
+        code: String(r["الكود"] || "").trim(),
+        name: String(r["الاسم"] || "").trim(),
+        category: String(r["القسم"] || "").trim(),
+        price: r["السعر"],
+        originalPrice: r["السعر قبل الخصم"],
+        description: String(r["الوصف"] || ""),
+        specs: String(r["المواصفات"] || ""),
+        image: String(r["رابط الصورة"] || ""),
+        status: String(r["الحالة"] || "متاح"),
+        stock: r["الكمية بالمخزون"],
+        minStock: r["حد التنبيه بالنقص"],
+        isNew: String(r["منتج جديد"] || "لا"),
+        isBestSeller: String(r["الأكثر مبيعاً"] || "لا"),
+      })).filter(r=>r.code && r.name);
+
+      const res = await fetch("/api/products/import", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ products: mapped }),
+      });
+      const data = await res.json();
+      setImportResult(data);
+      await loadAll();
+      showToast("تم الاستيراد بنجاح");
+    }catch(err){
+      showToast("تعذر قراءة الملف، تأكد إنه بنفس شكل القالب");
+    }
+    setImporting(false);
+    e.target.value = "";
+  }
+
   async function saveSettings(){
     await fetch("/api/settings", {
       method:"PUT", headers:{"Content-Type":"application/json"},
@@ -418,10 +463,21 @@ export default function AdminPage(){
 
           {tab==="products" && (
             <div>
-              <div style={{display:"flex", gap:10, marginBottom:18}}>
+              <div style={{display:"flex", gap:10, marginBottom:12, flexWrap:"wrap", alignItems:"center"}}>
                 <button className="kh-btn kh-btn-primary" onClick={openNewProduct}><Plus size={15}/> إضافة منتج</button>
                 <button className="kh-btn kh-btn-ghost" onClick={exportProductsCsv}><Upload size={15} style={{transform:"rotate(180deg)"}}/> تصدير Excel</button>
+                <label className="kh-btn kh-btn-sage" style={{cursor:"pointer"}}>
+                  <Upload size={15}/> استيراد من إكسل
+                  <input type="file" accept=".xlsx,.xls,.csv" hidden onChange={handleImportFile}/>
+                </label>
+                {importing && <span className="kh-muted">جارِ الاستيراد...</span>}
               </div>
+              {importResult && (
+                <div className={"kh-coupon-msg"+((importResult.errors?.length||0)===0?" ok":"")} style={{marginBottom:16}}>
+                  تم استيراد {importResult.added} منتج جديد، وتحديث {importResult.updated} منتج موجود.
+                  {importResult.errors?.length>0 && ` (${importResult.errors.length} صف فيه مشكلة)`}
+                </div>
+              )}
               <div className="kh-table-wrap">
                 <table className="kh-table">
                   <thead><tr><th>الصورة</th><th>الكود</th><th>الاسم</th><th>القسم</th><th>السعر</th><th>المخزون</th><th>الحالة</th><th></th></tr></thead>
