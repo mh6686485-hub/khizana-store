@@ -307,6 +307,27 @@ export default function AdminPage(){
     showToast("تم حفظ الإعدادات");
   }
 
+  const [pwForm,setPwForm] = useState({current:"",next:"",confirm:""});
+  const [pwMsg,setPwMsg] = useState("");
+  async function changePassword(){
+    if(pwForm.current !== settings.admin_password){ setPwMsg("كلمة السر الحالية غير صحيحة"); return; }
+    if(pwForm.next.length < 4){ setPwMsg("كلمة السر الجديدة قصيرة جدًا (4 أحرف على الأقل)"); return; }
+    if(pwForm.next !== pwForm.confirm){ setPwMsg("كلمة السر الجديدة وتأكيدها غير متطابقين"); return; }
+    await fetch("/api/settings", {
+      method:"PUT", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        storeName:settings.store_name, whatsapp:settings.whatsapp,
+        adminPassword:pwForm.next, shippingCost:settings.shipping_cost,
+        pointsPerEgp:settings.points_per_egp, pointValue:settings.point_value, freeShippingMin:settings.free_shipping_min,
+        minOrderAmount:settings.min_order_amount, aboutUs:settings.about_us, returnPolicy:settings.return_policy,
+        enableBankTransfer:settings.enable_bank_transfer, bankTransferDetails:settings.bank_transfer_details,
+      }),
+    });
+    setSettings({...settings, admin_password: pwForm.next});
+    setPwForm({current:"",next:"",confirm:""});
+    setPwMsg("تم تغيير كلمة السر بنجاح");
+  }
+
   function openNewBundle(){
     setBundleForm({id:null,name:"",description:"",image:"",price:"",active:true,items:[]});
     setShowBundleForm(true);
@@ -349,9 +370,9 @@ export default function AdminPage(){
     return (
       <div className="kh-root">
         <div className="kh-admin-login">
-          <form className="kh-modal" onSubmit={login} style={{maxWidth:360}}>
+          <form className="kh-modal" onSubmit={login} style={{maxWidth:360}} autoComplete="off">
             <div className="kh-logo" style={{marginBottom:18}}><span className="kh-dot"/>خِزانة ADMIN</div>
-            <label>كلمة المرور<input type="password" value={pw} onChange={e=>setPw(e.target.value)} autoFocus/></label>
+            <label>كلمة المرور<input type="password" name="khizana-boss-pw" value={pw} onChange={e=>setPw(e.target.value)} autoFocus autoComplete="off" data-lpignore="true" data-1p-ignore/></label>
             {error && <div className="kh-coupon-msg">{error}</div>}
             <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:14}} type="submit">دخول</button>
           </form>
@@ -756,7 +777,6 @@ export default function AdminPage(){
               <label>تكلفة الشحن (ج.م)<input type="number" value={settings.shipping_cost ?? 60} onChange={e=>setSettings({...settings,shipping_cost:e.target.value})}/></label>
               <label>شحن مجاني فوق (ج.م) — اتركها صفر لإلغاء الميزة<input type="number" value={settings.free_shipping_min ?? 0} onChange={e=>setSettings({...settings,free_shipping_min:e.target.value})}/></label>
               <label>الحد الأدنى لقيمة الطلب (ج.م) — اتركها صفر لإلغاء الميزة<input type="number" value={settings.min_order_amount ?? 0} onChange={e=>setSettings({...settings,min_order_amount:e.target.value})}/></label>
-              <label>كلمة مرور لوحة التحكم<input value={settings.admin_password||""} onChange={e=>setSettings({...settings,admin_password:e.target.value})}/></label>
               <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
                 <strong style={{fontSize:".9rem"}}>التحويل البنكي</strong>
               </div>
@@ -773,6 +793,16 @@ export default function AdminPage(){
               <label>نقطة لكل كام جنيه؟<input type="number" value={settings.points_per_egp ? Math.round(1/settings.points_per_egp) : 10} onChange={e=>setSettings({...settings,points_per_egp: 1/(Number(e.target.value)||10)})} placeholder="10"/></label>
               <label>قيمة النقطة الواحدة عند الاستخدام (ج.م)<input type="number" value={settings.point_value ?? 1} onChange={e=>setSettings({...settings,point_value:e.target.value})}/></label>
               <button className="kh-btn kh-btn-primary" onClick={saveSettings}>حفظ الإعدادات</button>
+
+              <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
+                <strong style={{fontSize:".9rem"}}>تغيير كلمة سر لوحة التحكم</strong>
+              </div>
+              <label>كلمة السر الحالية<input type="password" autoComplete="off" value={pwForm.current} onChange={e=>setPwForm({...pwForm,current:e.target.value})}/></label>
+              <label>كلمة السر الجديدة<input type="password" autoComplete="off" value={pwForm.next} onChange={e=>setPwForm({...pwForm,next:e.target.value})}/></label>
+              <label>تأكيد كلمة السر الجديدة<input type="password" autoComplete="off" value={pwForm.confirm} onChange={e=>setPwForm({...pwForm,confirm:e.target.value})}/></label>
+              {pwMsg && <div className={"kh-coupon-msg"+(pwMsg.startsWith("تم")?" ok":"")}>{pwMsg}</div>}
+              <button className="kh-btn kh-btn-primary" onClick={changePassword}>تغيير كلمة السر</button>
+
               <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
                 <strong style={{fontSize:".9rem"}}>نسخة احتياطية</strong>
                 <p className="kh-muted" style={{marginTop:6, marginBottom:10}}>تنزيل كل بيانات المتجر (منتجات، طلبات، عملاء...) كملف واحد.</p>
