@@ -87,7 +87,7 @@ export default function StorePage(){
   const [coupons,setCoupons] = useState([]);
   const [bundles,setBundles] = useState([]);
   const [ratings,setRatings] = useState({});
-  const [settings,setSettings] = useState({store_name:"خِزانة", whatsapp:"201000000000", shipping_cost:60});
+  const [settings,setSettings] = useState({store_name:"خِزانة", whatsapp:"201000000000", shipping_cost:60, enable_bank_transfer:false, bank_transfer_details:""});
   const [loading,setLoading] = useState(true);
   const [search,setSearch] = useState("");
   const [activeCategory,setActiveCategory] = useState("الكل");
@@ -111,6 +111,7 @@ export default function StorePage(){
   const [accountPromptOpen,setAccountPromptOpen] = useState(false);
   const [pendingWishlistProduct,setPendingWishlistProduct] = useState(null);
   const [myPoints,setMyPoints] = useState(null);
+  const [recentlyViewedIds,setRecentlyViewedIds] = useState([]);
 
   function showToast(msg){ setToast(msg); setTimeout(()=>setToast(""),2600); }
 
@@ -122,6 +123,11 @@ export default function StorePage(){
       if(savedCart){
         const parsed = JSON.parse(savedCart);
         if(Array.isArray(parsed)) setCart(parsed);
+      }
+      const savedViewed = localStorage.getItem("kh_recently_viewed");
+      if(savedViewed){
+        const parsedViewed = JSON.parse(savedViewed);
+        if(Array.isArray(parsedViewed)) setRecentlyViewedIds(parsedViewed);
       }
     }catch(e){}
   },[]);
@@ -156,8 +162,8 @@ export default function StorePage(){
 
         const sharedId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("product") : null;
         if(sharedId){
-          const found = productsData.find(p=>String(p.id)===String(sharedId));
-          if(found) setSelectedProduct(found);
+          window.location.replace(`/product/${sharedId}`);
+          return;
         }
       }catch(e){ console.error(e); }
       setLoading(false);
@@ -165,6 +171,10 @@ export default function StorePage(){
   },[]);
 
   const visibleProducts = products.filter(p=>p.status==="available" && Number(p.stock ?? 1) > 0);
+  const recentlyViewedProducts = recentlyViewedIds
+    .map(id=>visibleProducts.find(p=>p.id===id))
+    .filter(Boolean)
+    .slice(0,4);
 
   function applyFiltersSort(list){
     let out = list.filter(p=>{
@@ -270,7 +280,7 @@ export default function StorePage(){
     const payload = {
       items, subtotal, discount:couponDiscount, couponCode: appliedCoupon?appliedCoupon.code:null, total, customer,
       governorate: form.governorate, city: form.city, area: form.area, landmark: form.landmark,
-      usePoints: form.usePoints,
+      usePoints: form.usePoints, paymentMethod: form.paymentMethod,
     };
     try{
       const res = await fetch("/api/orders", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
@@ -449,6 +459,17 @@ export default function StorePage(){
         </section>
       )}
 
+      {recentlyViewedProducts.length>0 && (
+        <section className="kh-wrap kh-section" style={{paddingTop:0}}>
+          <div className="kh-section-head"><h2>شاهدته مؤخراً</h2></div>
+          <div className="kh-prod-grid">
+            {recentlyViewedProducts.map(p=>(
+              <ProductCard key={p.id} product={p} rating={ratings[p.id]} inWishlist={wishlist.includes(p.id)} onToggleWishlist={()=>toggleWishlist(p.id)} onAdd={()=>addToCart("product",p.id)}/>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section id="products-section" className="kh-wrap kh-section">
         <div className="kh-section-head">
           <h2><Leaf size={20} style={{verticalAlign:"-3px", color:"var(--olive)"}}/> الأكثر مبيعاً</h2>
@@ -501,6 +522,8 @@ export default function StorePage(){
         )}
       </section>
 
+      <NewsletterSignup storeName={settings.store_name}/>
+
       <footer className="kh-footer">
         <div className="kh-wrap kh-footer-inner">
           <span>© 2026 {settings.store_name}. جميع الحقوق محفوظة.</span>
@@ -531,7 +554,8 @@ export default function StorePage(){
       {checkoutOpen && (
         <CheckoutModal onClose={()=>setCheckoutOpen(false)} onSubmit={submitOrder}
           total={total} shippingCost={settings.shipping_cost} freeShippingMin={settings.free_shipping_min}
-          minOrderAmount={settings.min_order_amount} savedPhone={phone} myPoints={myPoints} />
+          minOrderAmount={settings.min_order_amount} savedPhone={phone} myPoints={myPoints}
+          enableBankTransfer={settings.enable_bank_transfer} bankTransferDetails={settings.bank_transfer_details} />
       )}
 
       {successOrder && (
@@ -574,25 +598,25 @@ function AccountPromptModal({onClose,onConfirm}){
   );
 }
 
-function ProductCard({product,rating,inWishlist,onToggleWishlist,onAdd,onOpen,showOffer}){
+function ProductCard({product,rating,inWishlist,onToggleWishlist,onAdd,showOffer}){
   const disc = discountPercent(product.price, product.original_price);
   const stock = Number(product.stock ?? 20);
   const available = product.status === "available" && stock > 0;
   const lowStock = available && stock <= Number(product.min_stock ?? 5);
   return (
     <div className={"kh-prod-card"+(available?"":" unavailable")}>
-      <div className="kh-prod-media" onClick={onOpen} role="button" tabIndex={0}>
+      <Link href={`/product/${product.id}`} className="kh-prod-media" style={{display:"block"}}>
         <ProductImage src={product.image} alt={product.name} className="kh-prod-img"/>
         {product.is_best_seller && <span className="kh-tag kh-tag-sage">الأكثر مبيعاً</span>}
         {product.is_new && !product.is_best_seller && <span className="kh-tag kh-tag-brass">جديد</span>}
         {disc>0 && <span className="kh-tag kh-tag-copper" style={{left:12,right:"auto"}}>خصم {disc}%</span>}
-        <button className={"kh-heart"+(inWishlist?" active":"")} onClick={e=>{e.stopPropagation();onToggleWishlist();}} aria-label="مفضلة">
+        <button className={"kh-heart"+(inWishlist?" active":"")} onClick={e=>{e.preventDefault();e.stopPropagation();onToggleWishlist();}} aria-label="مفضلة">
           <Heart size={16} fill={inWishlist?"currentColor":"none"}/>
         </button>
-      </div>
+      </Link>
       <div className="kh-prod-info">
         <span className="kh-prod-code">{product.code}</span>
-        <h4 onClick={onOpen} role="button" tabIndex={0}>{product.name}</h4>
+        <Link href={`/product/${product.id}`}><h4>{product.name}</h4></Link>
         {rating?.count>0 && (
           <div style={{display:"flex", alignItems:"center", gap:5, marginBottom:6}}>
             <StarsRow rating={rating.avg} size={12}/>
@@ -834,8 +858,8 @@ function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,freeShippi
   );
 }
 
-function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,minOrderAmount,savedPhone,myPoints}){
-  const [form,setForm] = useState({name:"",phone:savedPhone||"",phone2:"",governorate:"",city:"",area:"",address:"",landmark:"",usePoints:false});
+function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,minOrderAmount,savedPhone,myPoints,enableBankTransfer,bankTransferDetails}){
+  const [form,setForm] = useState({name:"",phone:savedPhone||"",phone2:"",governorate:"",city:"",area:"",address:"",landmark:"",usePoints:false,paymentMethod:"cod"});
   const [submitting,setSubmitting] = useState(false);
   const meetsMinOrder = !Number(minOrderAmount) || total >= Number(minOrderAmount);
   const canSubmit = meetsMinOrder && form.name.trim() && form.phone.trim() && form.governorate && form.city.trim() && form.address.trim();
@@ -865,7 +889,7 @@ function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,minO
         <p className="kh-muted">
           المنتجات: {egp(total)} ج.م + شحن {qualifiesFreeShipping ? "مجاني" : `${egp(effectiveShipping)} ج.م`}
           {pointsDiscount>0 && <> - نقاط {egp(pointsDiscount)} ج.م</>}
-          {" "}= <strong>{egp(grandTotal)} ج.م</strong> — الدفع عند الاستلام
+          {" "}= <strong>{egp(grandTotal)} ج.م</strong>
         </p>
         <div className="kh-form">
           <div className="kh-form-grid">
@@ -891,9 +915,27 @@ function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,minO
               عندك {pointsAvailable} نقطة (تساوي {egp(pointsAvailable*pointsValue)} ج.م) — استخدمها في الطلب ده؟
             </label>
           )}
-          <div className="kh-cat-item" style={{cursor:"default"}}>
-            <span>طريقة الدفع</span>
-            <strong style={{color:"var(--olive-deep)"}}>الدفع عند الاستلام</strong>
+
+          <div>
+            <strong style={{fontSize:".85rem", color:"var(--ink-soft)"}}>طريقة الدفع</strong>
+            <div style={{display:"flex", flexDirection:"column", gap:8, marginTop:8}}>
+              <label className="kh-filter-checkbox">
+                <input type="radio" name="paymentMethod" checked={form.paymentMethod==="cod"} onChange={()=>setForm({...form,paymentMethod:"cod"})}/>
+                الدفع عند الاستلام
+              </label>
+              {enableBankTransfer && (
+                <label className="kh-filter-checkbox">
+                  <input type="radio" name="paymentMethod" checked={form.paymentMethod==="bank_transfer"} onChange={()=>setForm({...form,paymentMethod:"bank_transfer"})}/>
+                  تحويل بنكي
+                </label>
+              )}
+            </div>
+            {enableBankTransfer && form.paymentMethod==="bank_transfer" && (
+              <div className="kh-free-shipping-note" style={{marginTop:10, whiteSpace:"pre-line"}}>
+                {bankTransferDetails || "من فضلك تواصل معنا لمعرفة بيانات التحويل."}
+                {"\n"}بعد التحويل، ابعت صورة الإيصال على واتساب مع رقم طلبك.
+              </div>
+            )}
           </div>
         </div>
         <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:14}} disabled={!canSubmit || submitting} onClick={handleSubmit}>
@@ -925,5 +967,44 @@ function OrderSuccessModal({order,storeName,onClose,onWhatsapp}){
         </div>
       </div>
     </div>
+  );
+}
+
+function NewsletterSignup({storeName}){
+  const [phone,setPhone] = useState("");
+  const [status,setStatus] = useState("idle");
+
+  async function subscribe(e){
+    e.preventDefault();
+    if(phone.trim().length<8) return;
+    setStatus("loading");
+    try{
+      const res = await fetch("/api/subscribe", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({phone:phone.trim()}),
+      });
+      if(res.ok){ setStatus("done"); setPhone(""); }
+      else setStatus("idle");
+    }catch(e){ setStatus("idle"); }
+  }
+
+  return (
+    <section className="kh-newsletter">
+      <div className="kh-wrap kh-newsletter-inner">
+        <div>
+          <h3>عايز تعرف قبل الكل بعروض {storeName}؟</h3>
+          <p className="kh-muted">اترك رقمك وهنبعتلك أحدث العروض على واتساب.</p>
+        </div>
+        {status==="done" ? (
+          <p className="kh-avail ok"><Check size={16}/> تم التسجيل، هنبعتلك أحدث العروض قريبًا!</p>
+        ) : (
+          <form className="kh-newsletter-form" onSubmit={subscribe}>
+            <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="رقم موبايلك" required/>
+            <button className="kh-btn kh-btn-primary" type="submit" disabled={status==="loading"}>
+              {status==="loading" ? "جارِ التسجيل..." : "اشترك الآن"}
+            </button>
+          </form>
+        )}
+      </div>
+    </section>
   );
 }

@@ -56,12 +56,13 @@ export async function POST(req) {
     const pointsEarned = Math.floor(finalTotal * pointsPerEgp);
 
     const id = "ORD-" + Date.now().toString(36).toUpperCase();
+    const paymentMethod = b.paymentMethod === "bank_transfer" ? "bank_transfer" : "cod";
     const { rows } = await p.query(
       `INSERT INTO orders
          (id, items, subtotal, discount, coupon_code, total, customer, status,
           governorate, city, area, landmark, phone2, shipping_cost, payment_method,
           points_earned, points_used)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'جديد',$8,$9,$10,$11,$12,$13,'cod',$14,$15)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'جديد',$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *, ('KH-' || (order_no + 10000)) AS order_number`,
       [
         id,
@@ -77,6 +78,7 @@ export async function POST(req) {
         b.landmark || "",
         b.phone2 || "",
         shippingCost,
+        paymentMethod,
         pointsEarned,
         pointsUsed,
       ]

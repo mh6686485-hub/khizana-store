@@ -35,7 +35,8 @@ export default function AdminPage(){
   const [report,setReport] = useState(null);
   const [bundles,setBundles] = useState([]);
   const [customers,setCustomers] = useState([]);
-  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60,points_per_egp:0.1,point_value:1,free_shipping_min:0,min_order_amount:0,about_us:"",return_policy:""});
+  const [subscribers,setSubscribers] = useState([]);
+  const [settings,setSettings] = useState({store_name:"",whatsapp:"",admin_password:"",shipping_cost:60,points_per_egp:0.1,point_value:1,free_shipping_min:0,min_order_amount:0,about_us:"",return_policy:"",enable_bank_transfer:false,bank_transfer_details:""});
 
   const [showForm,setShowForm] = useState(false);
   const [editing,setEditing] = useState(null);
@@ -110,7 +111,7 @@ export default function AdminPage(){
   }
 
   async function loadAll(){
-    const [p,c,cp,o,s,rv,rp,bd,cu] = await Promise.all([
+    const [p,c,cp,o,s,rv,rp,bd,cu,sub] = await Promise.all([
       fetch("/api/products").then(r=>r.json()),
       fetch("/api/categories").then(r=>r.json()),
       fetch("/api/coupons").then(r=>r.json()),
@@ -120,12 +121,14 @@ export default function AdminPage(){
       fetch("/api/reports").then(r=>r.json()),
       fetch("/api/bundles").then(r=>r.json()),
       fetch("/api/customers").then(r=>r.json()),
+      fetch("/api/subscribe").then(r=>r.json()),
     ]);
     setProducts(p); setCategories(c); setCoupons(cp); setOrders(o); setSettings(s);
     setReviews(Array.isArray(rv) ? rv : []);
     setReport(rp);
     setBundles(Array.isArray(bd) ? bd : []);
     setCustomers(Array.isArray(cu) ? cu : []);
+    setSubscribers(Array.isArray(sub) ? sub : []);
   }
 
   async function login(e){
@@ -198,6 +201,10 @@ export default function AdminPage(){
     await loadAll();
     showToast("تم تحديث حالة الطلب");
   }
+  async function saveOrderNote(id, note){
+    await fetch(`/api/orders/${id}`, { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({note}) });
+    showToast("تم حفظ الملاحظة");
+  }
 
   const [selectedOrderIds,setSelectedOrderIds] = useState([]);
   const [bulkStatus,setBulkStatus] = useState(ORDER_STATUSES[0]);
@@ -235,6 +242,11 @@ export default function AdminPage(){
     const rows = [["رقم الطلب","التاريخ","العميل","الهاتف","الإجمالي","الحالة"]];
     orders.forEach(o=>rows.push([o.order_number||o.id, new Date(o.created_at).toLocaleDateString("ar-EG"), o.customer?.name, o.customer?.phone, o.total, o.status]));
     downloadCsv("طلبات-خزانة.csv", rows);
+  }
+  function exportSubscribersCsv(){
+    const rows = [["رقم الهاتف","تاريخ الاشتراك"]];
+    subscribers.forEach(s=>rows.push([s.phone, new Date(s.created_at).toLocaleDateString("ar-EG")]));
+    downloadCsv("مشتركين-خزانة.csv", rows);
   }
 
   const [importing,setImporting] = useState(false);
@@ -289,6 +301,7 @@ export default function AdminPage(){
         adminPassword:settings.admin_password, shippingCost:settings.shipping_cost,
         pointsPerEgp:settings.points_per_egp, pointValue:settings.point_value, freeShippingMin:settings.free_shipping_min,
         minOrderAmount:settings.min_order_amount, aboutUs:settings.about_us, returnPolicy:settings.return_policy,
+        enableBankTransfer:settings.enable_bank_transfer, bankTransferDetails:settings.bank_transfer_details,
       }),
     });
     showToast("تم حفظ الإعدادات");
@@ -356,6 +369,7 @@ export default function AdminPage(){
     {id:"orders",label:"الطلبات",icon:Tag},
     {id:"reviews",label:"التقييمات",icon:Star},
     {id:"customers",label:"متابعة العملاء",icon:Users},
+    {id:"subscribers",label:"المشتركين",icon:MessageCircle},
     {id:"pages",label:"صفحات الموقع",icon:FileText},
     {id:"settings",label:"الإعدادات",icon:SettingsIcon},
   ];
@@ -630,8 +644,9 @@ export default function AdminPage(){
                       </div>
                       <ul>{(o.items||[]).map((it,i)=><li key={i}>{it.name} × {it.qty} — {egp(it.price*it.qty)} ج.م</li>)}</ul>
                       <div className="kh-order-total">
-                        الإجمالي: {egp(o.total)} ج.م (شحن {egp(o.shipping_cost)} ج.م) {o.coupon_code && `(كوبون ${o.coupon_code})`} — الدفع عند الاستلام
+                        الإجمالي: {egp(o.total)} ج.م (شحن {egp(o.shipping_cost)} ج.م) {o.coupon_code && `(كوبون ${o.coupon_code})`} — {o.payment_method==="bank_transfer" ? "تحويل بنكي" : "الدفع عند الاستلام"}
                       </div>
+                      <OrderNote orderId={o.id} initialNote={o.admin_note} onSave={saveOrderNote}/>
                     </div>
                   ))}
                 </div>
@@ -696,6 +711,35 @@ export default function AdminPage(){
             )
           )}
 
+          {tab==="subscribers" && (
+            <div>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16}}>
+                <p className="kh-muted">{subscribers.length} شخص مسجّل لاستقبال العروض.</p>
+                <button className="kh-btn kh-btn-ghost" onClick={exportSubscribersCsv}><Upload size={15} style={{transform:"rotate(180deg)"}}/> تصدير Excel</button>
+              </div>
+              {subscribers.length===0 ? <div className="kh-empty">لسه محدش اشترك.</div> : (
+                <div className="kh-table-wrap">
+                  <table className="kh-table">
+                    <thead><tr><th>رقم الهاتف</th><th>تاريخ الاشتراك</th><th></th></tr></thead>
+                    <tbody>
+                      {subscribers.map(s=>(
+                        <tr key={s.id}>
+                          <td>{s.phone}</td>
+                          <td>{new Date(s.created_at).toLocaleDateString("ar-EG")}</td>
+                          <td className="kh-table-actions">
+                            <a href={`https://wa.me/2${s.phone}`} target="_blank" rel="noopener" style={{background:"var(--cream-deep)", width:30, height:30, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center"}}>
+                              <MessageCircle size={15}/>
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {tab==="pages" && (
             <div className="kh-form" style={{maxWidth:560}}>
               <p className="kh-muted">النصوص دي بتظهر للعملاء في صفحتي "من نحن" و"سياسة الاستبدال" أسفل الموقع.</p>
@@ -713,6 +757,16 @@ export default function AdminPage(){
               <label>شحن مجاني فوق (ج.م) — اتركها صفر لإلغاء الميزة<input type="number" value={settings.free_shipping_min ?? 0} onChange={e=>setSettings({...settings,free_shipping_min:e.target.value})}/></label>
               <label>الحد الأدنى لقيمة الطلب (ج.م) — اتركها صفر لإلغاء الميزة<input type="number" value={settings.min_order_amount ?? 0} onChange={e=>setSettings({...settings,min_order_amount:e.target.value})}/></label>
               <label>كلمة مرور لوحة التحكم<input value={settings.admin_password||""} onChange={e=>setSettings({...settings,admin_password:e.target.value})}/></label>
+              <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
+                <strong style={{fontSize:".9rem"}}>التحويل البنكي</strong>
+              </div>
+              <label style={{flexDirection:"row", alignItems:"center", gap:8}}>
+                <input type="checkbox" checked={settings.enable_bank_transfer||false} onChange={e=>setSettings({...settings,enable_bank_transfer:e.target.checked})} style={{width:"auto"}}/>
+                فعّل التحويل البنكي كخيار دفع للعميل
+              </label>
+              {settings.enable_bank_transfer && (
+                <label>بيانات الحساب (تظهر للعميل عند اختيار التحويل)<textarea rows={3} value={settings.bank_transfer_details||""} onChange={e=>setSettings({...settings,bank_transfer_details:e.target.value})} placeholder="اسم البنك: ...&#10;رقم الحساب: ...&#10;اسم صاحب الحساب: ..."/></label>
+              )}
               <div className="kh-span-2" style={{borderTop:"1px solid rgba(53,67,49,.1)", paddingTop:14, marginTop:4}}>
                 <strong style={{fontSize:".9rem"}}>نقاط الولاء</strong>
               </div>
@@ -902,6 +956,25 @@ function AddImageUrlField({onAdd}){
         style={{padding:"9px 12px", borderRadius:10, border:"1px solid rgba(53,67,49,.16)", fontSize:".85rem"}}/>
       <button type="button" className="kh-btn kh-btn-ghost" style={{padding:"9px 14px", fontSize:".8rem"}}
         onClick={()=>{ if(value.trim()){ onAdd(value.trim()); setValue(""); } }}>إضافة</button>
+    </div>
+  );
+}
+
+function OrderNote({orderId, initialNote, onSave}){
+  const [note,setNote] = useState(initialNote || "");
+  const [dirty,setDirty] = useState(false);
+  return (
+    <div style={{marginTop:10, display:"flex", gap:8, alignItems:"center"}}>
+      <input
+        placeholder="ملاحظة داخلية (مش ظاهرة للعميل)..."
+        value={note}
+        onChange={e=>{ setNote(e.target.value); setDirty(true); }}
+        style={{flex:1, padding:"7px 12px", borderRadius:8, border:"1px solid rgba(53,67,49,.15)", fontSize:".8rem", background:"var(--cream)"}}
+      />
+      {dirty && (
+        <button className="kh-btn kh-btn-ghost" style={{padding:"6px 14px", fontSize:".78rem"}}
+          onClick={()=>{ onSave(orderId, note); setDirty(false); }}>حفظ</button>
+      )}
     </div>
   );
 }
