@@ -49,5 +49,49 @@ export default async function ProductPage({ params }) {
     );
   }
 
-  return <ProductPageClient product={product} settings={settings} />;
+  const { rows: reviewStats } = await p.query(
+    "SELECT AVG(rating)::numeric AS avg, COUNT(*)::int AS count FROM reviews WHERE product_id=$1 AND approved=true",
+    [product.id]
+  );
+  const avgRating = Number(reviewStats[0]?.avg || 0);
+  const reviewCount = Number(reviewStats[0]?.count || 0);
+  const inStock = product.status === "available" && Number(product.stock ?? 0) > 0;
+  const canonicalUrl = `https://khizana-next.vercel.app/product/${product.id}`;
+
+  const jsonLd = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    name: product.name,
+    description: product.description || product.name,
+    sku: product.code,
+    ...(product.image && product.image.startsWith("http") ? { image: [product.image] } : {}),
+    offers: {
+      "@type": "Offer",
+      url: canonicalUrl,
+      priceCurrency: "EGP",
+      price: product.price,
+      availability: inStock
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+    },
+    ...(reviewCount > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: avgRating.toFixed(1),
+            reviewCount,
+          },
+        }
+      : {}),
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ProductPageClient product={product} settings={settings} />
+    </>
+  );
 }

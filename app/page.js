@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, ImageOff, Lock, Truck, ShieldCheck, Headphones, Wallet, Leaf, Star, User, SlidersHorizontal, Package2, Gift, Share2 } from "lucide-react";
+import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, ImageOff, Lock, Truck, ShieldCheck, Headphones, Wallet, Leaf, Star, User, SlidersHorizontal, Package2, Gift, Share2, Moon, Sun } from "lucide-react";
+import { getTranslator } from "../lib/i18n";
 import Link from "next/link";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
@@ -89,6 +90,30 @@ export default function StorePage(){
   const [ratings,setRatings] = useState({});
   const [settings,setSettings] = useState({store_name:"خِزانة", whatsapp:"201000000000", shipping_cost:60, enable_bank_transfer:false, bank_transfer_details:""});
   const [loading,setLoading] = useState(true);
+  const [theme,setTheme] = useState("light");
+  const [lang,setLang] = useState("ar");
+  const t = getTranslator(lang);
+
+  useEffect(()=>{
+    const savedTheme = localStorage.getItem("kh_theme");
+    if(savedTheme==="dark") setTheme("dark");
+    const savedLang = localStorage.getItem("kh_lang");
+    if(savedLang==="en") setLang("en");
+  },[]);
+  function toggleTheme(){
+    const next = theme==="dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("kh_theme", next);
+    document.documentElement.setAttribute("data-theme", next==="dark" ? "dark" : "light");
+  }
+  function toggleLang(){
+    const next = lang==="ar" ? "en" : "ar";
+    setLang(next);
+    localStorage.setItem("kh_lang", next);
+    document.documentElement.setAttribute("lang", next);
+    document.documentElement.setAttribute("dir", next==="ar" ? "rtl" : "ltr");
+  }
+
   const [search,setSearch] = useState("");
   const [activeCategory,setActiveCategory] = useState("الكل");
   const [sortBy,setSortBy] = useState("newest");
@@ -326,8 +351,8 @@ export default function StorePage(){
 
       <div className="kh-topbar">
         <div className="kh-topbar-inner">
-          <span className="kh-topbar-item"><Truck size={14}/> توصيل لجميع محافظات مصر</span>
-          <span className="kh-topbar-item"><ShieldCheck size={14}/> ضمان جودة على جميع المنتجات</span>
+          <span className="kh-topbar-item"><Truck size={14}/> {t("deliveryAllEgypt")}</span>
+          <span className="kh-topbar-item"><ShieldCheck size={14}/> {t("qualityGuarantee")}</span>
         </div>
       </div>
 
@@ -336,31 +361,35 @@ export default function StorePage(){
           <div className="kh-logo-wrap">
             <div className="kh-logo-text">
               <h1>خِزانة</h1>
-              <div className="kh-logo-tagline">كل أدوات بيتك في مكان واحد</div>
+              <div className="kh-logo-tagline">{t("tagline")}</div>
             </div>
           </div>
           <div className="kh-search">
             <Search size={16}/>
-            <input placeholder="ابحث عن منتج..." value={search} onChange={e=>setSearch(e.target.value)} />
+            <input placeholder={t("searchPlaceholder")} value={search} onChange={e=>setSearch(e.target.value)} />
           </div>
           <div className="kh-header-actions">
+            <button className="kh-toggle-btn" onClick={toggleTheme} aria-label="theme">
+              {theme==="dark" ? <Sun size={17}/> : <Moon size={17}/>}
+            </button>
+            <button className="kh-lang-btn" onClick={toggleLang}>{lang==="ar" ? "EN" : "AR"}</button>
             <Link href="/account" className="kh-action-btn">
               <span style={{position:"relative"}}><User size={19}/></span>
-              حسابي
+              {t("myAccount")}
             </Link>
             <Link href="/account?tab=wishlist" className="kh-action-btn">
               <span style={{position:"relative"}}>
                 <Heart size={19}/>
                 {wishlistCount>0 && <span className="kh-badge">{wishlistCount}</span>}
               </span>
-              المفضلة
+              {t("wishlist")}
             </Link>
-            <button className="kh-action-btn" onClick={()=>setCartOpen(true)} aria-label="السلة">
+            <button className="kh-action-btn" onClick={()=>setCartOpen(true)} aria-label={t("cart")}>
               <span style={{position:"relative"}}>
                 <ShoppingCart size={19}/>
                 {cartCount>0 && <span className="kh-badge">{cartCount}</span>}
               </span>
-              السلة
+              {t("cart")}
             </button>
           </div>
         </div>
@@ -368,25 +397,25 @@ export default function StorePage(){
 
       <nav className="kh-catnav">
         <div className="kh-catnav-inner">
-          <button className={"kh-catnav-item"+(activeCategory==="الكل"?" active":"")} onClick={goHome}>الرئيسية</button>
+          <button className={"kh-catnav-item"+(activeCategory==="الكل"?" active":"")} onClick={goHome}>{t("home")}</button>
           {categories.map(c=>(
             <button key={c.id} className={"kh-catnav-item"+(activeCategory===c.name?" active":"")} onClick={()=>goCategory(c.name)}>{c.name}</button>
           ))}
-          <button className="kh-catnav-item" onClick={goOffers}>عروض خِزانة</button>
+          <button className="kh-catnav-item" onClick={goOffers}>{t("khizanaOffers")}</button>
         </div>
       </nav>
 
       <section className="kh-hero-section">
         <div className="kh-wrap kh-hero">
           <div>
-            <div className="kh-eyebrow">توصيل لجميع محافظات مصر</div>
-            <h1>كل حاجة يحتاجها بيتك، <span className="accent">مرتّبة</span> في مكان واحد</h1>
-            <p className="kh-lead">من المطبخ للتخزين والتنظيم — أدوات منزلك بجودة تضمنها وأسعار تناسب كل بيت.</p>
+            <div className="kh-eyebrow">{t("deliveryAllEgypt")}</div>
+            <h1>{t("heroTitlePart1")} <span className="accent">{t("heroTitleHighlight")}</span> {t("heroTitlePart2")}</h1>
+            <p className="kh-lead">{t("heroLead")}</p>
             <div className="kh-hero-actions">
               <button className="kh-btn kh-btn-primary" onClick={()=>document.getElementById("products-section")?.scrollIntoView({behavior:"smooth"})}>
-                <ShoppingCart size={16}/> تسوق الآن
+                <ShoppingCart size={16}/> {t("shopNow")}
               </button>
-              <button className="kh-btn kh-btn-outline-terracotta" onClick={goOffers}>عروض خِزانة</button>
+              <button className="kh-btn kh-btn-outline-terracotta" onClick={goOffers}>{t("khizanaOffers")}</button>
             </div>
           </div>
           <div className="kh-hero-visual"><HeroIllustration/></div>
@@ -397,29 +426,29 @@ export default function StorePage(){
         <div className="kh-wrap kh-benefits-grid">
           <div className="kh-benefit">
             <div className="kh-benefit-icon"><Truck size={20}/></div>
-            <div><h5>توصيل سريع</h5><p>في جميع المحافظات</p></div>
+            <div><h5>{t("fastDelivery")}</h5><p>{t("fastDeliverySub")}</p></div>
           </div>
           <div className="kh-benefit">
             <div className="kh-benefit-icon"><Headphones size={20}/></div>
-            <div><h5>خدمة عملاء مميزة</h5><p>نحن هنا لمساعدتك</p></div>
+            <div><h5>{t("greatSupport")}</h5><p>{t("greatSupportSub")}</p></div>
           </div>
           <div className="kh-benefit">
             <div className="kh-benefit-icon"><ShieldCheck size={20}/></div>
-            <div><h5>ضمان جودة</h5><p>على جميع المنتجات</p></div>
+            <div><h5>{t("qualityAssured")}</h5><p>{t("qualityAssuredSub")}</p></div>
           </div>
           <div className="kh-benefit">
             <div className="kh-benefit-icon"><Wallet size={20}/></div>
-            <div><h5>الدفع عند الاستلام</h5><p>ادفع عند استلام طلبك</p></div>
+            <div><h5>{t("cod")}</h5><p>{t("codSub")}</p></div>
           </div>
         </div>
       </section>
 
       {offerProducts.length>0 && (
         <section id="offers-section" className="kh-wrap kh-section">
-          <div className="kh-section-head"><h2>عروض خِزانة — هتفوتك لو اتأخرت</h2></div>
+          <div className="kh-section-head"><h2>{t("offersHeading")}</h2></div>
           <div className="kh-prod-grid">
             {offerProducts.map(p=>(
-              <ProductCard key={p.id} product={p} rating={ratings[p.id]} inWishlist={wishlist.includes(p.id)} onToggleWishlist={()=>toggleWishlist(p.id)} onAdd={()=>addToCart("product",p.id)} onOpen={()=>setSelectedProduct(p)} showOffer/>
+              <ProductCard key={p.id} product={p} rating={ratings[p.id]} inWishlist={wishlist.includes(p.id)} onToggleWishlist={()=>toggleWishlist(p.id)} onAdd={()=>addToCart("product",p.id)} onOpen={()=>setSelectedProduct(p)} showOffer t={t}/>
             ))}
           </div>
         </section>
@@ -427,7 +456,7 @@ export default function StorePage(){
 
       {bundles.length>0 && (
         <section className="kh-wrap kh-section" style={{paddingTop:0}}>
-          <div className="kh-section-head"><h2><Gift size={19} style={{verticalAlign:"-3px", color:"var(--terracotta)"}}/> باقات موفرة</h2></div>
+          <div className="kh-section-head"><h2><Gift size={19} style={{verticalAlign:"-3px", color:"var(--terracotta)"}}/> {t("bundlesHeading")}</h2></div>
           <div className="kh-prod-grid">
             {bundles.map(bd=>{
               const compTotal = (bd.items||[]).reduce((s,it)=>s+Number(it.price||0)*it.qty,0);
@@ -436,20 +465,20 @@ export default function StorePage(){
                 <div key={bd.id} className="kh-prod-card">
                   <div className="kh-prod-media">
                     <ProductImage src={bd.image || (bd.items?.[0]?.image)} alt={bd.name} className="kh-prod-img"/>
-                    {savings>0 && <span className="kh-tag kh-tag-copper">وفّر {egp(savings)} ج.م</span>}
+                    {savings>0 && <span className="kh-tag kh-tag-copper">{t("save")} {egp(savings)} {lang==="ar"?"ج.م":"EGP"}</span>}
                   </div>
                   <div className="kh-prod-info">
-                    <span className="kh-prod-code"><Package2 size={12} style={{verticalAlign:"-2px"}}/> باقة</span>
+                    <span className="kh-prod-code"><Package2 size={12} style={{verticalAlign:"-2px"}}/> {lang==="ar"?"باقة":"Bundle"}</span>
                     <h4>{bd.name}</h4>
                     <p className="kh-muted" style={{fontSize:".78rem", marginBottom:8}}>
-                      تشمل: {(bd.items||[]).map(it=>it.name).join("، ")}
+                      {t("includes")}: {(bd.items||[]).map(it=>it.name).join("، ")}
                     </p>
                     <div className="kh-price-row">
                       <div>
-                        <div className="kh-price">{egp(bd.price)} <small>ج.م</small></div>
-                        {compTotal>bd.price && <div className="kh-price-old">{egp(compTotal)} ج.م</div>}
+                        <div className="kh-price">{egp(bd.price)} <small>{lang==="ar"?"ج.م":"EGP"}</small></div>
+                        {compTotal>bd.price && <div className="kh-price-old">{egp(compTotal)} {lang==="ar"?"ج.م":"EGP"}</div>}
                       </div>
-                      <button className="kh-icon-btn kh-icon-btn-fill" onClick={()=>addToCart("bundle",bd.id)} aria-label="أضف الباقة للسلة"><ShoppingCart size={16}/></button>
+                      <button className="kh-icon-btn kh-icon-btn-fill" onClick={()=>addToCart("bundle",bd.id)} aria-label={t("addToCart")}><ShoppingCart size={16}/></button>
                     </div>
                   </div>
                 </div>
@@ -461,10 +490,10 @@ export default function StorePage(){
 
       {recentlyViewedProducts.length>0 && (
         <section className="kh-wrap kh-section" style={{paddingTop:0}}>
-          <div className="kh-section-head"><h2>شاهدته مؤخراً</h2></div>
+          <div className="kh-section-head"><h2>{t("recentlyViewed")}</h2></div>
           <div className="kh-prod-grid">
             {recentlyViewedProducts.map(p=>(
-              <ProductCard key={p.id} product={p} rating={ratings[p.id]} inWishlist={wishlist.includes(p.id)} onToggleWishlist={()=>toggleWishlist(p.id)} onAdd={()=>addToCart("product",p.id)}/>
+              <ProductCard key={p.id} product={p} rating={ratings[p.id]} inWishlist={wishlist.includes(p.id)} onToggleWishlist={()=>toggleWishlist(p.id)} onAdd={()=>addToCart("product",p.id)} t={t} lang={lang}/>
             ))}
           </div>
         </section>
@@ -472,65 +501,65 @@ export default function StorePage(){
 
       <section id="products-section" className="kh-wrap kh-section">
         <div className="kh-section-head">
-          <h2><Leaf size={20} style={{verticalAlign:"-3px", color:"var(--olive)"}}/> الأكثر مبيعاً</h2>
+          <h2><Leaf size={20} style={{verticalAlign:"-3px", color:"var(--olive)"}}/> {t("bestSellersHeading")}</h2>
           <button className="kh-btn kh-btn-ghost" style={{padding:"9px 16px", fontSize:".82rem"}} onClick={()=>setFiltersOpen(v=>!v)}>
-            <SlidersHorizontal size={14}/> فلاتر وترتيب
+            <SlidersHorizontal size={14}/> {t("filtersAndSort")}
           </button>
         </div>
 
         {filtersOpen && (
           <div className="kh-filters-bar">
-            <label>ترتيب حسب
+            <label>{t("sortBy")}
               <select value={sortBy} onChange={e=>setSortBy(e.target.value)}>
-                <option value="newest">الأحدث</option>
-                <option value="price_asc">السعر: من الأقل للأعلى</option>
-                <option value="price_desc">السعر: من الأعلى للأقل</option>
-                <option value="discount">الأكثر خصمًا</option>
+                <option value="newest">{t("newest")}</option>
+                <option value="price_asc">{t("priceLowHigh")}</option>
+                <option value="price_desc">{t("priceHighLow")}</option>
+                <option value="discount">{t("mostDiscounted")}</option>
               </select>
             </label>
-            <label>من (ج.م)<input type="number" value={priceMin} onChange={e=>setPriceMin(e.target.value)} placeholder="0"/></label>
-            <label>إلى (ج.م)<input type="number" value={priceMax} onChange={e=>setPriceMax(e.target.value)} placeholder="بدون حد"/></label>
-            <label>التقييم
+            <label>{t("from")}<input type="number" value={priceMin} onChange={e=>setPriceMin(e.target.value)} placeholder="0"/></label>
+            <label>{t("to")}<input type="number" value={priceMax} onChange={e=>setPriceMax(e.target.value)} placeholder="0"/></label>
+            <label>{t("rating")}
               <select value={minRating} onChange={e=>setMinRating(Number(e.target.value))}>
-                <option value={0}>الكل</option>
-                <option value={3}>3 نجوم فأكثر</option>
-                <option value={4}>4 نجوم فأكثر</option>
-                <option value={5}>5 نجوم فقط</option>
+                <option value={0}>{t("all")}</option>
+                <option value={3}>{t("threeStars")}</option>
+                <option value={4}>{t("fourStars")}</option>
+                <option value={5}>{t("fiveStars")}</option>
               </select>
             </label>
             <label className="kh-filter-checkbox">
               <input type="checkbox" checked={onlyDiscounted} onChange={e=>setOnlyDiscounted(e.target.checked)}/>
-              عليها خصم فقط
+              {t("discountedOnly")}
             </label>
           </div>
         )}
 
         <div className="kh-chips">
-          <button className={"kh-chip"+(activeCategory==="الكل"?" active":"")} onClick={()=>setActiveCategory("الكل")}>الكل</button>
+          <button className={"kh-chip"+(activeCategory==="الكل"?" active":"")} onClick={()=>setActiveCategory("الكل")}>{t("all")}</button>
           {categories.map(c=>(
             <button key={c.id} className={"kh-chip"+(activeCategory===c.name?" active":"")} onClick={()=>setActiveCategory(c.name)}>{c.name}</button>
           ))}
         </div>
         {filteredProducts.length===0 ? (
-          <div className="kh-empty">مفيش منتجات مطابقة لهذا البحث/الفلاتر حالياً.</div>
+          <div className="kh-empty">{t("noProductsMatch")}</div>
         ) : (
           <div className="kh-prod-grid" style={{marginTop:26}}>
             {filteredProducts.map(p=>(
-              <ProductCard key={p.id} product={p} rating={ratings[p.id]} inWishlist={wishlist.includes(p.id)} onToggleWishlist={()=>toggleWishlist(p.id)} onAdd={()=>addToCart("product",p.id)} onOpen={()=>setSelectedProduct(p)}/>
+              <ProductCard key={p.id} product={p} rating={ratings[p.id]} inWishlist={wishlist.includes(p.id)} onToggleWishlist={()=>toggleWishlist(p.id)} onAdd={()=>addToCart("product",p.id)} onOpen={()=>setSelectedProduct(p)} t={t} lang={lang}/>
             ))}
           </div>
         )}
       </section>
 
-      <NewsletterSignup storeName={settings.store_name}/>
+      <NewsletterSignup storeName={settings.store_name} t={t}/>
 
       <footer className="kh-footer">
         <div className="kh-wrap kh-footer-inner">
-          <span>© 2026 {settings.store_name}. جميع الحقوق محفوظة.</span>
+          <span>© 2026 {settings.store_name}. {t("allRightsReserved")}</span>
           <div style={{display:"flex", gap:18}}>
-            <Link href="/about" className="kh-admin-link">من نحن</Link>
-            <Link href="/returns" className="kh-admin-link">سياسة الاستبدال</Link>
-            <Link href="/track" className="kh-admin-link">تتبع طلبك</Link>
+            <Link href="/about" className="kh-admin-link">{t("aboutUs")}</Link>
+            <Link href="/returns" className="kh-admin-link">{t("returnPolicy")}</Link>
+            <Link href="/track" className="kh-admin-link">{t("trackOrder")}</Link>
           </div>
         </div>
       </footer>
@@ -548,23 +577,24 @@ export default function StorePage(){
           shippingCost={settings.shipping_cost} freeShippingMin={settings.free_shipping_min}
           couponInput={couponInput} setCouponInput={setCouponInput} applyCoupon={applyCoupon} couponMsg={couponMsg}
           appliedCoupon={appliedCoupon} updateQty={updateQty} onClose={()=>setCartOpen(false)}
-          onCheckout={()=>{ setCartOpen(false); setCheckoutOpen(true); }} />
+          onCheckout={()=>{ setCartOpen(false); setCheckoutOpen(true); }} t={t} lang={lang} />
       )}
 
       {checkoutOpen && (
         <CheckoutModal onClose={()=>setCheckoutOpen(false)} onSubmit={submitOrder}
           total={total} shippingCost={settings.shipping_cost} freeShippingMin={settings.free_shipping_min}
           minOrderAmount={settings.min_order_amount} savedPhone={phone} myPoints={myPoints}
-          enableBankTransfer={settings.enable_bank_transfer} bankTransferDetails={settings.bank_transfer_details} />
+          enableBankTransfer={settings.enable_bank_transfer} bankTransferDetails={settings.bank_transfer_details}
+          t={t} lang={lang} />
       )}
 
       {successOrder && (
         <OrderSuccessModal order={successOrder} storeName={settings.store_name}
-          onClose={()=>setSuccessOrder(null)} onWhatsapp={()=>sendOrderOnWhatsapp(successOrder)} />
+          onClose={()=>setSuccessOrder(null)} onWhatsapp={()=>sendOrderOnWhatsapp(successOrder)} t={t} lang={lang} />
       )}
 
       {accountPromptOpen && (
-        <AccountPromptModal onClose={()=>{setAccountPromptOpen(false); setPendingWishlistProduct(null);}} onConfirm={confirmPhone} />
+        <AccountPromptModal onClose={()=>{setAccountPromptOpen(false); setPendingWishlistProduct(null);}} onConfirm={confirmPhone} t={t} />
       )}
 
       {cartCount>0 && !cartOpen && (
@@ -577,7 +607,7 @@ export default function StorePage(){
   );
 }
 
-function AccountPromptModal({onClose,onConfirm}){
+function AccountPromptModal({onClose,onConfirm,t}){
   const [value,setValue] = useState("");
   return (
     <div className="kh-overlay" onClick={onClose}>
@@ -586,19 +616,21 @@ function AccountPromptModal({onClose,onConfirm}){
         <div style={{width:56,height:56,borderRadius:"50%",background:"var(--cream-deep)",display:"flex",alignItems:"center",justifyContent:"center",margin:"6px auto 16px",color:"var(--olive-deep)"}}>
           <User size={26}/>
         </div>
-        <h3 style={{marginBottom:8}}>حسابي في خِزانة</h3>
-        <p className="kh-muted" style={{marginBottom:18}}>أدخل رقم موبايلك عشان نحفظلك المفضلة ونعرض طلباتك</p>
+        <h3 style={{marginBottom:8}}>{t("myKhizanaAccount")}</h3>
+        <p className="kh-muted" style={{marginBottom:18}}>{t("accountPromptText")}</p>
         <div className="kh-form">
           <input value={value} onChange={e=>setValue(e.target.value)} placeholder="01xxxxxxxxx"/>
         </div>
         <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:14}}
-          disabled={value.trim().length<8} onClick={()=>onConfirm(value.trim())}>دخول</button>
+          disabled={value.trim().length<8} onClick={()=>onConfirm(value.trim())}>{t("login")}</button>
       </div>
     </div>
   );
 }
 
-function ProductCard({product,rating,inWishlist,onToggleWishlist,onAdd,showOffer}){
+function ProductCard({product,rating,inWishlist,onToggleWishlist,onAdd,showOffer,t,lang}){
+  const tr = t || ((k)=>k);
+  const isAr = lang!=="en";
   const disc = discountPercent(product.price, product.original_price);
   const stock = Number(product.stock ?? 20);
   const available = product.status === "available" && stock > 0;
@@ -607,10 +639,10 @@ function ProductCard({product,rating,inWishlist,onToggleWishlist,onAdd,showOffer
     <div className={"kh-prod-card"+(available?"":" unavailable")}>
       <Link href={`/product/${product.id}`} className="kh-prod-media" style={{display:"block"}}>
         <ProductImage src={product.image} alt={product.name} className="kh-prod-img"/>
-        {product.is_best_seller && <span className="kh-tag kh-tag-sage">الأكثر مبيعاً</span>}
-        {product.is_new && !product.is_best_seller && <span className="kh-tag kh-tag-brass">جديد</span>}
-        {disc>0 && <span className="kh-tag kh-tag-copper" style={{left:12,right:"auto"}}>خصم {disc}%</span>}
-        <button className={"kh-heart"+(inWishlist?" active":"")} onClick={e=>{e.preventDefault();e.stopPropagation();onToggleWishlist();}} aria-label="مفضلة">
+        {product.is_best_seller && <span className="kh-tag kh-tag-sage">{tr("bestSeller")}</span>}
+        {product.is_new && !product.is_best_seller && <span className="kh-tag kh-tag-brass">{tr("newBadge")}</span>}
+        {disc>0 && <span className="kh-tag kh-tag-copper" style={{left:12,right:"auto"}}>{tr("discountBadge")} {disc}%</span>}
+        <button className={"kh-heart"+(inWishlist?" active":"")} onClick={e=>{e.preventDefault();e.stopPropagation();onToggleWishlist();}} aria-label={tr("wishlist")}>
           <Heart size={16} fill={inWishlist?"currentColor":"none"}/>
         </button>
       </Link>
@@ -624,14 +656,14 @@ function ProductCard({product,rating,inWishlist,onToggleWishlist,onAdd,showOffer
           </div>
         )}
         {showOffer && product.offer_expiry && <Countdown expiry={product.offer_expiry}/>}
-        {!available && <div className="kh-avail out" style={{marginBottom:4}}>نفد من المخزون</div>}
-        {lowStock && <div className="kh-avail out" style={{marginBottom:4}}>متبقي {stock} فقط</div>}
+        {!available && <div className="kh-avail out" style={{marginBottom:4}}>{tr("outOfStock")}</div>}
+        {lowStock && <div className="kh-avail out" style={{marginBottom:4}}>{tr("onlyLeft")} {stock} {tr("justLeft")}</div>}
         <div className="kh-price-row">
           <div>
-            <div className="kh-price">{egp(product.price)} <small>ج.م</small></div>
-            {disc>0 && <div className="kh-price-old">{egp(product.original_price)} ج.م</div>}
+            <div className="kh-price">{egp(product.price)} <small>{isAr?"ج.م":"EGP"}</small></div>
+            {disc>0 && <div className="kh-price-old">{egp(product.original_price)} {isAr?"ج.م":"EGP"}</div>}
           </div>
-          <button className="kh-icon-btn kh-icon-btn-fill" onClick={onAdd} aria-label="أضف للسلة" disabled={!available}><ShoppingCart size={16}/></button>
+          <button className="kh-icon-btn kh-icon-btn-fill" onClick={onAdd} aria-label={tr("addToCart")} disabled={!available}><ShoppingCart size={16}/></button>
         </div>
       </div>
     </div>
@@ -799,7 +831,8 @@ function ProductDetail({product,onClose,onAdd,whatsapp,storeName,inWishlist,togg
   );
 }
 
-function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,freeShippingMin,couponInput,setCouponInput,applyCoupon,couponMsg,appliedCoupon,updateQty,onClose,onCheckout}){
+function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,freeShippingMin,couponInput,setCouponInput,applyCoupon,couponMsg,appliedCoupon,updateQty,onClose,onCheckout,t,lang}){
+  const cur = lang==="ar" ? "ج.م" : "EGP";
   const qualifiesFreeShipping = Number(freeShippingMin) > 0 && total >= Number(freeShippingMin);
   const effectiveShipping = qualifiesFreeShipping ? 0 : Number(shippingCost || 0);
   const grandTotal = total + effectiveShipping;
@@ -807,15 +840,15 @@ function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,freeShippi
   return (
     <div className="kh-overlay" onClick={onClose}>
       <div className="kh-drawer" onClick={e=>e.stopPropagation()}>
-        <div className="kh-drawer-head"><h3>سلة المشتريات</h3><button onClick={onClose}><X size={18}/></button></div>
-        {lines.length===0 ? <div className="kh-empty">السلة فارغة حالياً.</div> : (
+        <div className="kh-drawer-head"><h3>{t("cartTitle")}</h3><button onClick={onClose}><X size={18}/></button></div>
+        {lines.length===0 ? <div className="kh-empty">{t("cartEmpty")}</div> : (
           <div className="kh-cart-lines">
             {lines.map(l=>(
               <div key={l.type+"-"+l.id} className="kh-cart-line">
                 <ProductImage src={l.image} alt={l.name} className="kh-cart-img"/>
                 <div className="kh-cart-line-info">
-                  <h5>{l.name}{l.type==="bundle" && <span className="kh-status" style={{marginRight:6, fontSize:".65rem"}}>باقة</span>}</h5>
-                  <span>{egp(l.price)} ج.م</span>
+                  <h5>{l.name}{l.type==="bundle" && <span className="kh-status" style={{marginRight:6, fontSize:".65rem"}}>{lang==="ar"?"باقة":"Bundle"}</span>}</h5>
+                  <span>{egp(l.price)} {cur}</span>
                   <div className="kh-qty-row small">
                     <button onClick={()=>updateQty(l.type,l.id,l.qty-1)}><Minus size={12}/></button>
                     <span>{l.qty}</span>
@@ -831,26 +864,26 @@ function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,freeShippi
           <>
             {remainingForFreeShipping>0 && (
               <div className="kh-free-shipping-note">
-                <Truck size={14}/> ضيف {egp(remainingForFreeShipping)} ج.م كمان واحصل على شحن مجاني!
+                <Truck size={14}/> {t("freeShippingRemaining")} {egp(remainingForFreeShipping)} {t("freeShippingRemaining2")}
               </div>
             )}
             {qualifiesFreeShipping && (
               <div className="kh-free-shipping-note ok">
-                <Truck size={14}/> مبروك، طلبك مؤهل للشحن المجاني!
+                <Truck size={14}/> {t("freeShippingQualified")}
               </div>
             )}
             <div className="kh-coupon-row">
-              <input placeholder="كود الخصم" value={couponInput} onChange={e=>setCouponInput(e.target.value)}/>
-              <button onClick={applyCoupon}>تطبيق</button>
+              <input placeholder={t("couponPlaceholder")} value={couponInput} onChange={e=>setCouponInput(e.target.value)}/>
+              <button onClick={applyCoupon}>{t("apply")}</button>
             </div>
             {couponMsg && <div className={"kh-coupon-msg"+(appliedCoupon?" ok":"")}>{couponMsg}</div>}
             <div className="kh-cart-summary">
-              <div><span>الإجمالي الفرعي</span><span>{egp(subtotal)} ج.م</span></div>
-              {couponDiscount>0 && <div><span>خصم الكوبون</span><span>-{egp(couponDiscount)} ج.م</span></div>}
-              <div><span>الشحن</span><span>{qualifiesFreeShipping ? "مجاني" : `${egp(effectiveShipping)} ج.م`}</span></div>
-              <div className="kh-cart-total"><span>الإجمالي</span><span>{egp(grandTotal)} ج.م</span></div>
+              <div><span>{t("subtotal")}</span><span>{egp(subtotal)} {cur}</span></div>
+              {couponDiscount>0 && <div><span>{t("couponDiscount")}</span><span>-{egp(couponDiscount)} {cur}</span></div>}
+              <div><span>{t("shipping")}</span><span>{qualifiesFreeShipping ? t("free") : `${egp(effectiveShipping)} ${cur}`}</span></div>
+              <div className="kh-cart-total"><span>{t("total")}</span><span>{egp(grandTotal)} {cur}</span></div>
             </div>
-            <button className="kh-btn kh-btn-primary kh-full" onClick={onCheckout}>إتمام الطلب</button>
+            <button className="kh-btn kh-btn-primary kh-full" onClick={onCheckout}>{t("checkoutBtn")}</button>
           </>
         )}
       </div>
@@ -858,7 +891,8 @@ function CartDrawer({lines,subtotal,couponDiscount,total,shippingCost,freeShippi
   );
 }
 
-function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,minOrderAmount,savedPhone,myPoints,enableBankTransfer,bankTransferDetails}){
+function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,minOrderAmount,savedPhone,myPoints,enableBankTransfer,bankTransferDetails,t,lang}){
+  const cur = lang==="ar" ? "ج.م" : "EGP";
   const [form,setForm] = useState({name:"",phone:savedPhone||"",phone2:"",governorate:"",city:"",area:"",address:"",landmark:"",usePoints:false,paymentMethod:"cod"});
   const [submitting,setSubmitting] = useState(false);
   const meetsMinOrder = !Number(minOrderAmount) || total >= Number(minOrderAmount);
@@ -880,73 +914,75 @@ function CheckoutModal({onClose,onSubmit,total,shippingCost,freeShippingMin,minO
     <div className="kh-overlay" onClick={onClose}>
       <div className="kh-modal" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
         <button className="kh-close" onClick={onClose}><X size={18}/></button>
-        <h3>بيانات التوصيل</h3>
+        <h3>{t("deliveryInfo")}</h3>
         {!meetsMinOrder && (
           <div className="kh-coupon-msg" style={{marginBottom:10}}>
-            الحد الأدنى لقيمة الطلب {egp(minOrderAmount)} ج.م — ضيف منتجات أكتر عشان تقدر تكمل الطلب.
+            {lang==="ar" ? `الحد الأدنى لقيمة الطلب ${egp(minOrderAmount)} ج.م — ضيف منتجات أكتر عشان تقدر تكمل الطلب.` : `Minimum order value is ${egp(minOrderAmount)} EGP — add more products to continue.`}
           </div>
         )}
         <p className="kh-muted">
-          المنتجات: {egp(total)} ج.م + شحن {qualifiesFreeShipping ? "مجاني" : `${egp(effectiveShipping)} ج.م`}
-          {pointsDiscount>0 && <> - نقاط {egp(pointsDiscount)} ج.م</>}
-          {" "}= <strong>{egp(grandTotal)} ج.م</strong>
+          {lang==="ar" ? "المنتجات" : "Products"}: {egp(total)} {cur} + {t("shipping")} {qualifiesFreeShipping ? t("free") : `${egp(effectiveShipping)} ${cur}`}
+          {pointsDiscount>0 && <> - {lang==="ar"?"نقاط":"points"} {egp(pointsDiscount)} {cur}</>}
+          {" "}= <strong>{egp(grandTotal)} {cur}</strong>
         </p>
         <div className="kh-form">
           <div className="kh-form-grid">
-            <label>الاسم بالكامل<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
-            <label>رقم الموبايل<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="01xxxxxxxxx"/></label>
+            <label>{t("fullName")}<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
+            <label>{t("mobileNumber")}<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="01xxxxxxxxx"/></label>
           </div>
-          <label>رقم موبايل احتياطي (اختياري)<input value={form.phone2} onChange={e=>setForm({...form,phone2:e.target.value})} placeholder="01xxxxxxxxx"/></label>
+          <label>{t("backupMobile")}<input value={form.phone2} onChange={e=>setForm({...form,phone2:e.target.value})} placeholder="01xxxxxxxxx"/></label>
           <div className="kh-form-grid">
-            <label>المحافظة
+            <label>{t("governorate")}
               <select value={form.governorate} onChange={e=>setForm({...form,governorate:e.target.value})}>
-                <option value="">اختر المحافظة</option>
+                <option value="">{t("chooseGovernorate")}</option>
                 {EGYPT_GOVERNORATES.map(g=><option key={g} value={g}>{g}</option>)}
               </select>
             </label>
-            <label>المدينة / المركز<input value={form.city} onChange={e=>setForm({...form,city:e.target.value})}/></label>
+            <label>{t("city")}<input value={form.city} onChange={e=>setForm({...form,city:e.target.value})}/></label>
           </div>
-          <label>المنطقة (اختياري)<input value={form.area} onChange={e=>setForm({...form,area:e.target.value})}/></label>
-          <label>العنوان بالتفصيل<textarea rows={3} value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/></label>
-          <label>علامة مميزة (اختياري)<input value={form.landmark} onChange={e=>setForm({...form,landmark:e.target.value})} placeholder="بجوار..."/></label>
+          <label>{t("area")}<input value={form.area} onChange={e=>setForm({...form,area:e.target.value})}/></label>
+          <label>{t("fullAddress")}<textarea rows={3} value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/></label>
+          <label>{t("landmark")}<input value={form.landmark} onChange={e=>setForm({...form,landmark:e.target.value})} placeholder="..."/></label>
           {pointsAvailable>0 && (
             <label className="kh-filter-checkbox">
               <input type="checkbox" checked={form.usePoints} onChange={e=>setForm({...form,usePoints:e.target.checked})}/>
-              عندك {pointsAvailable} نقطة (تساوي {egp(pointsAvailable*pointsValue)} ج.م) — استخدمها في الطلب ده؟
+              {lang==="ar"
+                ? `عندك ${pointsAvailable} نقطة (تساوي ${egp(pointsAvailable*pointsValue)} ج.م) — استخدمها في الطلب ده؟`
+                : `You have ${pointsAvailable} points (worth ${egp(pointsAvailable*pointsValue)} EGP) — use them on this order?`}
             </label>
           )}
 
           <div>
-            <strong style={{fontSize:".85rem", color:"var(--ink-soft)"}}>طريقة الدفع</strong>
+            <strong style={{fontSize:".85rem", color:"var(--ink-soft)"}}>{t("paymentMethod")}</strong>
             <div style={{display:"flex", flexDirection:"column", gap:8, marginTop:8}}>
               <label className="kh-filter-checkbox">
                 <input type="radio" name="paymentMethod" checked={form.paymentMethod==="cod"} onChange={()=>setForm({...form,paymentMethod:"cod"})}/>
-                الدفع عند الاستلام
+                {t("cod")}
               </label>
               {enableBankTransfer && (
                 <label className="kh-filter-checkbox">
                   <input type="radio" name="paymentMethod" checked={form.paymentMethod==="bank_transfer"} onChange={()=>setForm({...form,paymentMethod:"bank_transfer"})}/>
-                  تحويل بنكي
+                  {t("bankTransfer")}
                 </label>
               )}
             </div>
             {enableBankTransfer && form.paymentMethod==="bank_transfer" && (
               <div className="kh-free-shipping-note" style={{marginTop:10, whiteSpace:"pre-line"}}>
-                {bankTransferDetails || "من فضلك تواصل معنا لمعرفة بيانات التحويل."}
-                {"\n"}بعد التحويل، ابعت صورة الإيصال على واتساب مع رقم طلبك.
+                {bankTransferDetails || (lang==="ar" ? "من فضلك تواصل معنا لمعرفة بيانات التحويل." : "Please contact us for transfer details.")}
+                {"\n"}{lang==="ar" ? "بعد التحويل، ابعت صورة الإيصال على واتساب مع رقم طلبك." : "After transferring, send the receipt on WhatsApp with your order number."}
               </div>
             )}
           </div>
         </div>
         <button className="kh-btn kh-btn-primary kh-full" style={{marginTop:14}} disabled={!canSubmit || submitting} onClick={handleSubmit}>
-          {submitting ? "جارِ الإرسال..." : "تأكيد الطلب"}
+          {submitting ? t("sending") : t("confirmOrder")}
         </button>
       </div>
     </div>
   );
 }
 
-function OrderSuccessModal({order,storeName,onClose,onWhatsapp}){
+function OrderSuccessModal({order,storeName,onClose,onWhatsapp,t}){
   return (
     <div className="kh-overlay" onClick={onClose}>
       <div className="kh-modal" onClick={e=>e.stopPropagation()} style={{maxWidth:440, textAlign:"center"}}>
@@ -954,23 +990,23 @@ function OrderSuccessModal({order,storeName,onClose,onWhatsapp}){
         <div style={{width:64,height:64,borderRadius:"50%",background:"var(--cream-deep)",display:"flex",alignItems:"center",justifyContent:"center",margin:"8px auto 18px",color:"var(--olive-deep)"}}>
           <Check size={32}/>
         </div>
-        <h2 style={{marginBottom:8}}>تم استلام طلبك بنجاح 🎉</h2>
-        <p className="kh-muted" style={{marginBottom:4}}>رقم الطلب</p>
+        <h2 style={{marginBottom:8}}>{t("orderSuccessTitle")} 🎉</h2>
+        <p className="kh-muted" style={{marginBottom:4}}>{t("orderNumber")}</p>
         <div style={{fontSize:"1.6rem",fontWeight:700,color:"var(--olive-deep)",marginBottom:16}}>{order.order_number}</div>
         {Number(order.points_earned)>0 && (
-          <p className="kh-avail ok" style={{justifyContent:"center", marginBottom:12}}>كسبت {order.points_earned} نقطة من الطلب ده!</p>
+          <p className="kh-avail ok" style={{justifyContent:"center", marginBottom:12}}>{t("pointsEarned")} {order.points_earned} {t("pointsEarned2")}</p>
         )}
-        <p className="kh-muted" style={{marginBottom:22}}>شكرًا لطلبك من {storeName} ❤️<br/>سيتم مراجعة طلبك والتواصل معك لتأكيده.</p>
+        <p className="kh-muted" style={{marginBottom:22}}>{t("thankYouOrder")} {storeName} ❤️<br/>{t("orderReviewNote")}</p>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          <Link href={`/track?order=${encodeURIComponent(order.order_number)}`} className="kh-btn kh-btn-primary kh-full">تتبع الطلب</Link>
-          <button className="kh-btn kh-btn-sage kh-full" onClick={onWhatsapp}>التواصل عبر واتساب</button>
+          <Link href={`/track?order=${encodeURIComponent(order.order_number)}`} className="kh-btn kh-btn-primary kh-full">{t("trackOrderBtn")}</Link>
+          <button className="kh-btn kh-btn-sage kh-full" onClick={onWhatsapp}>{t("contactWhatsapp")}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function NewsletterSignup({storeName}){
+function NewsletterSignup({storeName,t}){
   const [phone,setPhone] = useState("");
   const [status,setStatus] = useState("idle");
 
@@ -991,16 +1027,16 @@ function NewsletterSignup({storeName}){
     <section className="kh-newsletter">
       <div className="kh-wrap kh-newsletter-inner">
         <div>
-          <h3>عايز تعرف قبل الكل بعروض {storeName}؟</h3>
-          <p className="kh-muted">اترك رقمك وهنبعتلك أحدث العروض على واتساب.</p>
+          <h3>{t("newsletterHeading")} {storeName}؟</h3>
+          <p className="kh-muted">{t("newsletterSub")}</p>
         </div>
         {status==="done" ? (
-          <p className="kh-avail ok"><Check size={16}/> تم التسجيل، هنبعتلك أحدث العروض قريبًا!</p>
+          <p className="kh-avail ok"><Check size={16}/> {t("subscribedDone")}</p>
         ) : (
           <form className="kh-newsletter-form" onSubmit={subscribe}>
-            <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="رقم موبايلك" required/>
+            <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder={t("newsletterPlaceholder")} required/>
             <button className="kh-btn kh-btn-primary" type="submit" disabled={status==="loading"}>
-              {status==="loading" ? "جارِ التسجيل..." : "اشترك الآن"}
+              {status==="loading" ? t("subscribing") : t("subscribeNow")}
             </button>
           </form>
         )}

@@ -26,6 +26,18 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700;900&display=swap"
           rel="stylesheet"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try{
+                var theme = localStorage.getItem('kh_theme');
+                if(theme==='dark'){ document.documentElement.setAttribute('data-theme','dark'); }
+                var lang = localStorage.getItem('kh_lang');
+                if(lang==='en'){ document.documentElement.setAttribute('lang','en'); document.documentElement.setAttribute('dir','ltr'); }
+              }catch(e){}
+            `,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>

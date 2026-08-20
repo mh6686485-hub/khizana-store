@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingCart, Heart, X, Plus, Minus, Check, ImageOff, Clock, Star, Share2, ArrowRight } from "lucide-react";
+import { ShoppingCart, Heart, X, Plus, Minus, Check, ImageOff, Clock, Star, Share2, ArrowRight, Moon, Sun } from "lucide-react";
 import Link from "next/link";
+import { getTranslator } from "../../../lib/i18n";
 
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
 function discountPercent(price, original){
@@ -63,6 +64,31 @@ export default function ProductPageClient({ product, settings }){
   const [inWishlist,setInWishlist] = useState(false);
   const [accountPromptOpen,setAccountPromptOpen] = useState(false);
   const [toast,setToast] = useState("");
+  const [theme,setTheme] = useState("light");
+  const [lang,setLang] = useState("ar");
+  const t = getTranslator(lang);
+  const cur = lang==="ar" ? "ج.م" : "EGP";
+
+  useEffect(()=>{
+    const savedTheme = localStorage.getItem("kh_theme");
+    if(savedTheme==="dark") setTheme("dark");
+    const savedLang = localStorage.getItem("kh_lang");
+    if(savedLang==="en") setLang("en");
+  },[]);
+  function toggleTheme(){
+    const next = theme==="dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("kh_theme", next);
+    document.documentElement.setAttribute("data-theme", next);
+  }
+  function toggleLang(){
+    const next = lang==="ar" ? "en" : "ar";
+    setLang(next);
+    localStorage.setItem("kh_lang", next);
+    document.documentElement.setAttribute("lang", next);
+    document.documentElement.setAttribute("dir", next==="ar" ? "rtl" : "ltr");
+  }
+
 
   const disc = discountPercent(product.price, product.original_price);
   const stock = Number(product.stock ?? 20);
@@ -159,9 +185,15 @@ export default function ProductPageClient({ product, settings }){
           <Link href="/" className="kh-logo-wrap">
             <div className="kh-logo-text"><h1>{settings.store_name}</h1></div>
           </Link>
-          <Link href="/" className="kh-action-btn" style={{marginRight:"auto"}}>
-            <ArrowRight size={18}/> الرجوع للمتجر
-          </Link>
+          <div style={{display:"flex", alignItems:"center", gap:10, marginRight:"auto"}}>
+            <button className="kh-toggle-btn" onClick={toggleTheme} aria-label="theme">
+              {theme==="dark" ? <Sun size={17}/> : <Moon size={17}/>}
+            </button>
+            <button className="kh-lang-btn" onClick={toggleLang}>{lang==="ar" ? "EN" : "AR"}</button>
+            <Link href="/" className="kh-action-btn">
+              <ArrowRight size={18}/> {t("backToStore")}
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -185,16 +217,16 @@ export default function ProductPageClient({ product, settings }){
             {reviews.length>0 && (
               <div className="kh-stars-row">
                 <StarsRow rating={avgRating} size={14}/>
-                <span className="kh-muted" style={{fontSize:".8rem"}}>({reviews.length} تقييم)</span>
+                <span className="kh-muted" style={{fontSize:".8rem"}}>({reviews.length} {t("reviews")})</span>
               </div>
             )}
             <div className="kh-detail-price-row">
-              <span className="kh-price" style={{fontSize:"1.6rem"}}>{egp(product.price)} <small>ج.م</small></span>
-              {disc>0 && <span className="kh-price-old">{egp(product.original_price)} ج.م</span>}
-              {disc>0 && <span className="kh-tag kh-tag-copper" style={{position:"static"}}>خصم {disc}%</span>}
+              <span className="kh-price" style={{fontSize:"1.6rem"}}>{egp(product.price)} <small>{cur}</small></span>
+              {disc>0 && <span className="kh-price-old">{egp(product.original_price)} {cur}</span>}
+              {disc>0 && <span className="kh-tag kh-tag-copper" style={{position:"static"}}>{t("discountBadge")} {disc}%</span>}
             </div>
             <span className={"kh-avail "+(available?"ok":"out")}>
-              {available ? <><Check size={14}/> متوفر في المخزون{lowStock ? ` — متبقي ${stock} فقط` : ""}</> : "نفد من المخزون"}
+              {available ? <><Check size={14}/> {t("inStock")}{lowStock ? ` — ${t("onlyLeft")} ${stock} ${t("justLeft")}` : ""}</> : t("outOfStock")}
             </span>
             {product.offer_expiry && <div style={{marginTop:6}}><Countdown expiry={product.offer_expiry}/></div>}
             <p className="kh-detail-desc">{product.description}</p>
@@ -207,12 +239,12 @@ export default function ProductPageClient({ product, settings }){
               <button onClick={()=>setQty(q=>Math.min(stock||99, q+1))}><Plus size={14}/></button>
             </div>
             <div className="kh-detail-actions">
-              <button className="kh-btn kh-btn-primary" onClick={addToCart} disabled={!available}><ShoppingCart size={16}/> أضف للسلة</button>
-              <button className="kh-btn kh-btn-sage" onClick={orderNow}>اطلب عبر واتساب</button>
-              <button className={"kh-btn kh-btn-ghost-icon"+(inWishlist?" active":"")} onClick={toggleWishlist} aria-label="مفضلة">
+              <button className="kh-btn kh-btn-primary" onClick={addToCart} disabled={!available}><ShoppingCart size={16}/> {t("addToCart")}</button>
+              <button className="kh-btn kh-btn-sage" onClick={orderNow}>{t("orderOnWhatsapp")}</button>
+              <button className={"kh-btn kh-btn-ghost-icon"+(inWishlist?" active":"")} onClick={toggleWishlist} aria-label={t("wishlist")}>
                 <Heart size={17} fill={inWishlist?"currentColor":"none"}/>
               </button>
-              <button className="kh-btn kh-btn-ghost-icon" onClick={shareProduct} aria-label="مشاركة">
+              <button className="kh-btn kh-btn-ghost-icon" onClick={shareProduct} aria-label={t("share")}>
                 <Share2 size={17}/>
               </button>
             </div>
@@ -221,13 +253,13 @@ export default function ProductPageClient({ product, settings }){
 
         {related.length>0 && (
           <div className="kh-reviews-section" style={{maxWidth:900, margin:"24px auto 0"}}>
-            <h3 style={{fontSize:"1.05rem", marginBottom:14}}>منتجات مشابهة</h3>
+            <h3 style={{fontSize:"1.05rem", marginBottom:14}}>{t("similarProducts")}</h3>
             <div className="kh-related-grid">
               {related.map(r=>(
                 <Link key={r.id} href={`/product/${r.id}`} className="kh-related-card">
                   <ProductImage src={r.image} alt={r.name} className="kh-related-img"/>
                   <span className="kh-related-name">{r.name}</span>
-                  <span className="kh-related-price">{egp(r.price)} ج.م</span>
+                  <span className="kh-related-price">{egp(r.price)} {cur}</span>
                 </Link>
               ))}
             </div>
@@ -235,8 +267,8 @@ export default function ProductPageClient({ product, settings }){
         )}
 
         <div className="kh-reviews-section" style={{maxWidth:900, margin:"24px auto 0"}}>
-          <h3 style={{fontSize:"1.05rem", marginBottom:14}}>آراء العملاء</h3>
-          {reviews.length===0 && <p className="kh-muted" style={{marginBottom:14}}>لسه مفيش تقييمات على المنتج ده، كن أول من يقيّمه.</p>}
+          <h3 style={{fontSize:"1.05rem", marginBottom:14}}>{t("customerReviews")}</h3>
+          {reviews.length===0 && <p className="kh-muted" style={{marginBottom:14}}>{t("noReviewsYet")}</p>}
           {reviews.length>0 && (
             <div className="kh-review-list">
               {reviews.map(r=>(
@@ -251,19 +283,19 @@ export default function ProductPageClient({ product, settings }){
             </div>
           )}
           {reviewSubmitted ? (
-            <p className="kh-avail ok" style={{marginTop:14}}><Check size={14}/> شكراً لتقييمك، هيظهر بعد المراجعة.</p>
+            <p className="kh-avail ok" style={{marginTop:14}}><Check size={14}/> {t("reviewSubmittedThanks")}</p>
           ) : (
             <form className="kh-form" onSubmit={submitReview} style={{marginTop:16}}>
               <div className="kh-form-grid">
-                <label>اسمك<input value={reviewForm.name} onChange={e=>setReviewForm({...reviewForm,name:e.target.value})} required/></label>
-                <label>تقييمك
+                <label>{t("yourName")}<input value={reviewForm.name} onChange={e=>setReviewForm({...reviewForm,name:e.target.value})} required/></label>
+                <label>{t("yourRating")}
                   <select value={reviewForm.rating} onChange={e=>setReviewForm({...reviewForm,rating:Number(e.target.value)})}>
                     {[5,4,3,2,1].map(n=><option key={n} value={n}>{"⭐".repeat(n)}</option>)}
                   </select>
                 </label>
               </div>
-              <label>تعليقك (اختياري)<textarea rows={2} value={reviewForm.comment} onChange={e=>setReviewForm({...reviewForm,comment:e.target.value})}/></label>
-              <button className="kh-btn kh-btn-sage" type="submit">إرسال التقييم</button>
+              <label>{t("yourComment")}<textarea rows={2} value={reviewForm.comment} onChange={e=>setReviewForm({...reviewForm,comment:e.target.value})}/></label>
+              <button className="kh-btn kh-btn-sage" type="submit">{t("submitReview")}</button>
             </form>
           )}
         </div>
