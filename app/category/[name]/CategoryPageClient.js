@@ -70,7 +70,7 @@ export default function CategoryPageClient({ categoryName }){
     Promise.all([fetch("/api/products"), fetch("/api/reviews/summary")])
       .then(([pRes, rRes])=>Promise.all([pRes.json(), rRes.json()]))
       .then(([prods, rats])=>{
-        setProducts((prods||[]).filter(p=>p.category===categoryName && p.status==="available" && Number(p.stock??1)>0));
+        setProducts((prods||[]).filter(p=>p.category===decodeURIComponent(categoryName) && p.status==="available" && Number(p.stock??1)>0));
         setRatings(rats||{});
       })
       .catch(()=>{})
