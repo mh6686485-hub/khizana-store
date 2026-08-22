@@ -4,6 +4,15 @@ import { ShoppingCart, Heart, Search, X, Plus, Minus, Trash2, Clock, Check, Imag
 import { getTranslator } from "../lib/i18n";
 import Link from "next/link";
 
+const SUBCATEGORIES = {
+  "أدوات الشرب": ["الكل","أكواب","أطقم أكواب","أطقم شربات","ترامس","دوارق","زجاجات","كاسات","مجات","فناجين قهوة وشاي"],
+  "أدوات المائدة": ["الكل","أطباق","أطقم سفرة","أطقم شاي وقهوة","أطقم عشاء","أطقم معالق","بولات","صواني تقديم"],
+  "أدوات المطبخ": ["الكل","أطقم توزيع","برطمانات وأطقم توابل","رقايع المطبخ","سكاكين","علب تخزين وحفظ طعام","لانش بوكس"],
+  "مستلزمات المنزل": ["الكل","اكسسوارات","أدوات ومستلزمات تنظيف","سبت غسيل","سلة المهملات","منظمات المنزل"],
+  "أجهزة كهربائية": ["الكل","أجهزة مطبخ","أجهزة منزلية خفيفة"],
+  "أدوات الطهي": ["الكل","أطقم حلل","جريل","صواني فرن","طاسات","طواجن وصواني حرارية","كنك القهوة واللبانات","حلة"],
+};
+
 function egp(n){ return Number(n||0).toLocaleString("ar-EG"); }
 function discountPercent(price, original){
   if(!original || original<=price) return 0;
@@ -399,7 +408,7 @@ export default function StorePage(){
         <div className="kh-catnav-inner">
           <button className={"kh-catnav-item"+(activeCategory==="الكل"?" active":"")} onClick={goHome}>{t("home")}</button>
           {categories.map(c=>(
-            <button key={c.id} className={"kh-catnav-item"+(activeCategory===c.name?" active":"")} onClick={()=>goCategory(c.name)}>{c.name}</button>
+            <div key={c.id} className="kh-catnav-item"><Link href={`/category/${encodeURIComponent(c.name)}`} className={"kh-catnav-btn"+(activeCategory===c.name?" active":"")}>{c.name}</Link></div>
           ))}
           <button className="kh-catnav-item" onClick={goOffers}>{t("khizanaOffers")}</button>
         </div>

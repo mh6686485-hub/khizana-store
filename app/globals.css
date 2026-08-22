@@ -368,4 +368,90 @@ img{max-width:100%;display:block;}
   .kh-fab-cart{width:50px;height:50px;bottom:16px;left:16px;}
   .kh-stat-grid{grid-template-columns:1fr 1fr;}
 }
+/* ══ PATCHES: sticky header, dropdown, category page ══ */
 
+.kh-header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--white);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+
+.kh-topbar { position: relative; z-index: 201; }
+
+/* Category hero */
+.kh-category-hero {
+  background: linear-gradient(135deg, var(--cream) 0%, var(--cream-deep) 100%);
+  padding: 40px 0 28px;
+}
+.kh-category-hero h1 {
+  font-size: 1.8rem;
+  color: var(--olive-deep);
+  margin: 0 0 6px;
+}
+.kh-category-hero p {
+  color: var(--ink-soft);
+  font-size: .95rem;
+  margin: 0;
+}
+.kh-subcats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0 0;
+}
+.kh-subcat-chip {
+  padding: 7px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--cream-deep);
+  background: var(--white);
+  color: var(--ink);
+  font-size: .85rem;
+  cursor: pointer;
+  transition: all .15s;
+}
+.kh-subcat-chip:hover,
+.kh-subcat-chip.active {
+  background: var(--olive);
+  color: var(--white);
+  border-color: var(--olive);
+}
+
+/* Navbar dropdown */
+.kh-catnav { position: relative; z-index: 190; }
+.kh-catnav-item { position: relative; }
+.kh-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 190px;
+  background: var(--white);
+  border: 1px solid var(--cream-deep);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+  padding: 8px 0;
+  z-index: 300;
+  flex-direction: column;
+}
+.kh-catnav-item:hover .kh-dropdown {
+  display: flex;
+}
+.kh-dropdown-item {
+  display: block;
+  padding: 9px 18px;
+  font-size: .88rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  text-align: right;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background .15s;
+}
+.kh-dropdown-item:hover {
+  background: var(--cream-deep);
+  color: var(--olive-deep);
+}
