@@ -672,7 +672,12 @@ function ProductCard({product,rating,inWishlist,onToggleWishlist,onAdd,showOffer
             <div className="kh-price">{egp(product.price)} <small>{isAr?"ج.م":"EGP"}</small></div>
             {disc>0 && <div className="kh-price-old">{egp(product.original_price)} {isAr?"ج.م":"EGP"}</div>}
           </div>
-          <button className="kh-icon-btn kh-icon-btn-fill" onClick={onAdd} aria-label={tr("addToCart")} disabled={!available}><ShoppingCart size={16}/></button>
+        </div>
+        <div className="kh-card-actions">
+          <button className="kh-btn-addcart" onClick={onAdd} disabled={!available}>
+            <ShoppingCart size={14}/> {tr("addToCart")}
+          </button>
+          <Link href={`/product/${product.id}`} className="kh-btn-quickview">{isAr?"عرض سريع":"Quick View"}</Link>
         </div>
       </div>
     </div>
